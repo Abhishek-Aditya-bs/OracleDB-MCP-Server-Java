@@ -427,32 +427,38 @@ public class OracleDbMcpServer {
                     // Parse environment from natural language
                     Environment environment = parseEnvironment(request, environmentParam);
                     
-                    // Test connection
-                    boolean connected = connectionManager.testConnection(environment);
+                    // Test connection with timeout handling
+                    boolean connected;
+                    String connectionMessage;
                     
-                    if (connected) {
-                        connectionManager.switchEnvironment(environment);
-                        
-                        Map<String, Object> response = new HashMap<>();
-                        response.put("operation", "connect_to_environment");
-                        response.put("environment", environment.getKey());
-                        response.put("environment_display", config.getEnvironmentDisplayName(environment));
-                        response.put("status", "connected");
-                        response.put("message", "Successfully connected to " + config.getEnvironmentDisplayName(environment) + " environment");
-                        
-                        ObjectMapper mapper = new ObjectMapper();
-                        String jsonResponse = mapper.writeValueAsString(response);
-                        
-                        return new McpSchema.CallToolResult(
-                            List.of(new McpSchema.TextContent(jsonResponse)),
-                            false
-                        );
-                    } else {
-                        return new McpSchema.CallToolResult(
-                            "Failed to connect to " + config.getEnvironmentDisplayName(environment) + " environment. Please check your configuration and network connectivity.",
-                            true
-                        );
+                    try {
+                        connected = connectionManager.testConnection(environment);
+                        if (connected) {
+                            connectionManager.switchEnvironment(environment);
+                            connectionMessage = "Successfully connected to " + config.getEnvironmentDisplayName(environment) + " environment";
+                        } else {
+                            connectionMessage = "Connection test failed for " + config.getEnvironmentDisplayName(environment) + " environment. Please verify your database configuration and network connectivity.";
+                        }
+                    } catch (Exception e) {
+                        connected = false;
+                        connectionMessage = "Connection attempt failed for " + config.getEnvironmentDisplayName(environment) + " environment: " + e.getMessage();
                     }
+                    
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("operation", "connect_to_environment");
+                    response.put("environment", environment.getKey());
+                    response.put("environment_display", config.getEnvironmentDisplayName(environment));
+                    response.put("status", connected ? "connected" : "failed");
+                    response.put("message", connectionMessage);
+                    response.put("timestamp", System.currentTimeMillis());
+                    
+                    ObjectMapper mapper = new ObjectMapper();
+                    String jsonResponse = mapper.writeValueAsString(response);
+                    
+                    return new McpSchema.CallToolResult(
+                        List.of(new McpSchema.TextContent(jsonResponse)),
+                        !connected  // isError = true if connection failed
+                    );
                     
                 } catch (Exception e) {
                     return new McpSchema.CallToolResult(

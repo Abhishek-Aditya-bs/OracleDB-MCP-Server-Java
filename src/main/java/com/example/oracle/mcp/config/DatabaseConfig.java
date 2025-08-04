@@ -250,7 +250,12 @@ public class DatabaseConfig {
         // Kerberos authentication
         props.setProperty("oracle.net.authentication_services", "(KERBEROS5)");
         props.setProperty("oracle.net.kerberos5_cc_name", getKerberosCCachePath());
-        props.setProperty("oracle.net.CONNECT_TIMEOUT", getConnectionTimeout());
+        
+        // Multiple timeout settings for robustness (30 seconds)
+        props.setProperty("oracle.net.CONNECT_TIMEOUT", "30000");           // Connection timeout
+        props.setProperty("oracle.jdbc.ReadTimeout", "30000");              // Read timeout  
+        props.setProperty("oracle.net.READ_TIMEOUT", "30000");              // Network read timeout
+        props.setProperty("oracle.net.ns.SQLNetTimeoutConnection", "30");   // SQLNet timeout (seconds)
         
         // JDBC tracing if enabled
         if (isJdbcTraceEnabled()) {

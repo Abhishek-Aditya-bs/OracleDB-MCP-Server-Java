@@ -67,11 +67,26 @@ public class DatabaseConnectionManager {
         Properties props = config.getConnectionProperties(environment);
         
         try {
-            Connection connection = DriverManager.getConnection(url, props);
-            connectionPool.put(environment, connection);
-            this.currentEnvironment = environment;
+            // Set connection timeout to prevent hanging
+            DriverManager.setLoginTimeout(30); // 30 seconds timeout
             
-            return connection;
+            Connection connection = DriverManager.getConnection(url, props);
+            
+            // Test the connection immediately
+            if (connection != null && !connection.isClosed()) {
+                // Quick validation query with timeout
+                try (Statement testStmt = connection.createStatement()) {
+                    testStmt.setQueryTimeout(10); // 10 seconds for validation
+                    testStmt.executeQuery("SELECT 1 FROM DUAL").close();
+                }
+                
+                connectionPool.put(environment, connection);
+                this.currentEnvironment = environment;
+                
+                return connection;
+            } else {
+                throw new SQLException("Connection is null or closed");
+            }
         } catch (SQLException e) {
             throw new SQLException("Failed to connect to " + environment + " environment: " + e.getMessage(), e);
         }
@@ -308,11 +323,17 @@ public class DatabaseConnectionManager {
     public boolean testConnection(Environment environment) {
         try {
             Connection connection = connectToEnvironment(environment);
-            try (Statement stmt = connection.createStatement();
-                 ResultSet rs = stmt.executeQuery("SELECT 1 FROM DUAL")) {
-                return rs.next();
+            try (Statement stmt = connection.createStatement()) {
+                stmt.setQueryTimeout(10); // 10 seconds timeout for test query
+                try (ResultSet rs = stmt.executeQuery("SELECT 1 FROM DUAL")) {
+                    return rs.next();
+                }
             }
         } catch (SQLException e) {
+            System.err.println("Connection test failed for " + environment + ": " + e.getMessage());
+            return false;
+        } catch (Exception e) {
+            System.err.println("Unexpected error testing connection for " + environment + ": " + e.getMessage());
             return false;
         }
     }
