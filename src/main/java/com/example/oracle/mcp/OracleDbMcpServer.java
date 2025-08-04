@@ -125,53 +125,40 @@ public class OracleDbMcpServer {
             executeQueryTool,
             (exchange, arguments) -> {
                 try {
-                    String query = (String) arguments.get("query");
+                    String sql = (String) arguments.get("sql");
                     String environmentParam = (String) arguments.get("environment");
                     String schemaParam = (String) arguments.get("schema");
                     
-                    if (query == null || query.trim().isEmpty()) {
+                    if (sql == null || sql.trim().isEmpty()) {
                         return new McpSchema.CallToolResult(
-                            "Query parameter is required and cannot be empty",
+                            "SQL parameter is required and cannot be empty",
                             true
                         );
                     }
                     
-                    // Parse environment and schema from natural language
-                    Environment environment = parseEnvironment(query, environmentParam);
-                    Schema selectedSchema = parseSchema(query, schemaParam);
+                    // Parse environment and schema
+                    Environment environment = environmentParam != null ? 
+                        Environment.fromString(environmentParam) : connectionManager.getCurrentEnvironment();
+                    Schema selectedSchema = schemaParam != null ? 
+                        config.findSchemaByName(schemaParam) : connectionManager.getCurrentSchema();
                     
-                    QueryResult result;
-                    String executedQuery;
-                    
-                    if (useIntelligentQuery && !query.trim().toUpperCase().startsWith("SELECT")) {
-                        // Use intelligent query building for natural language
-                        result = connectionManager.executeIntelligentQuery(query, environment, selectedSchema);
-                        executedQuery = "[Intelligent Query Built from: " + query + "]";
-                    } else {
-                        // Extract SQL from natural language if needed
-                        String cleanQuery = extractSqlFromText(query);
-                        
-                        // Security check: only allow SELECT statements
-                        String upperQuery = cleanQuery.trim().toUpperCase();
-                        if (!upperQuery.startsWith("SELECT")) {
-                            return new McpSchema.CallToolResult(
-                                "Only SELECT queries are allowed for security reasons. Query must start with SELECT.",
-                                true
-                            );
-                        }
-                        
-                        // Execute the query
-                        result = connectionManager.executeQuery(cleanQuery, environment, selectedSchema);
-                        executedQuery = cleanQuery;
+                    // Security check: only allow SELECT statements
+                    String upperSql = sql.trim().toUpperCase();
+                    if (!upperSql.startsWith("SELECT")) {
+                        return new McpSchema.CallToolResult(
+                            "Only SELECT queries are allowed for security reasons. Query must start with SELECT.",
+                            true
+                        );
                     }
+                    
+                    // Execute the query
+                    QueryResult result = connectionManager.executeQuery(sql, environment, selectedSchema);
                     
                     Map<String, Object> response = new HashMap<>();
                     response.put("operation", "execute_query");
                     response.put("environment", environment.getKey());
                     response.put("schema", selectedSchema.getName());
-                    response.put("original_request", query);
-                    response.put("executed_query", executedQuery);
-                    response.put("intelligent_query_used", useIntelligentQuery && !query.trim().toUpperCase().startsWith("SELECT"));
+                    response.put("executed_sql", sql);
                     response.put("result", result.toMap());
                     response.put("formatted_result", result.toFormattedString());
                     

@@ -4,6 +4,7 @@ import com.example.oracle.mcp.config.DatabaseConfig.Schema;
 
 import java.sql.*;
 import java.util.*;
+import java.util.Date;
 
 /**
  * Represents schema information including tables, views, and other database objects.
@@ -53,7 +54,7 @@ public class SchemaInfo {
                     String tableName = rs.getString("table_name");
                     Long numRows = rs.getLong("num_rows");
                     if (rs.wasNull()) numRows = null;
-                    Date lastAnalyzed = rs.getDate("last_analyzed");
+                    java.util.Date lastAnalyzed = rs.getDate("last_analyzed");
                     
                     List<ColumnInfo> columns = loadTableColumns(connection, schema, tableName);
                     tables.add(new TableInfo(tableName, numRows, lastAnalyzed, columns));
@@ -212,10 +213,10 @@ public class SchemaInfo {
     public static class TableInfo {
         private final String name;
         private final Long numRows;
-        private final Date lastAnalyzed;
+        private final java.util.Date lastAnalyzed;
         private final List<ColumnInfo> columns;
         
-        public TableInfo(String name, Long numRows, Date lastAnalyzed, List<ColumnInfo> columns) {
+        public TableInfo(String name, Long numRows, java.util.Date lastAnalyzed, List<ColumnInfo> columns) {
             this.name = name;
             this.numRows = numRows;
             this.lastAnalyzed = lastAnalyzed;
@@ -234,7 +235,7 @@ public class SchemaInfo {
         // Getters
         public String getName() { return name; }
         public Long getNumRows() { return numRows; }
-        public Date getLastAnalyzed() { return lastAnalyzed; }
+        public java.util.Date getLastAnalyzed() { return lastAnalyzed; }
         public List<ColumnInfo> getColumns() { return columns; }
     }
     
