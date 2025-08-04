@@ -6,6 +6,10 @@ import com.example.oracle.mcp.config.DatabaseConfig.Schema;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.sql.Date;
+import java.sql.Clob;
+import java.sql.Blob;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -69,7 +73,9 @@ public class QueryResult {
             for (int i = 1; i <= columnCount; i++) {
                 String columnName = columnNames.get(i - 1);
                 Object value = resultSet.getObject(i);
-                row.put(columnName, value);
+                // Convert Oracle-specific types to JSON-serializable types
+                Object convertedValue = convertOracleType(value);
+                row.put(columnName, convertedValue);
             }
             rows.add(row);
         }
@@ -213,5 +219,79 @@ public class QueryResult {
     
     public String getQuery() {
         return query;
+    }
+    
+    /**
+     * Convert Oracle-specific data types to JSON-serializable Java types
+     */
+    private static Object convertOracleType(Object value) {
+        if (value == null) {
+            return null;
+        }
+        
+        // Handle Oracle TIMESTAMP types
+        if (value instanceof oracle.sql.TIMESTAMP) {
+            try {
+                oracle.sql.TIMESTAMP timestamp = (oracle.sql.TIMESTAMP) value;
+                return timestamp.timestampValue().toString();
+            } catch (SQLException e) {
+                return value.toString();
+            }
+        }
+        
+        // Handle Oracle DATE types
+        if (value instanceof oracle.sql.DATE) {
+            oracle.sql.DATE date = (oracle.sql.DATE) value;
+            return date.timestampValue().toString();
+        }
+        
+        // Handle standard SQL TIMESTAMP
+        if (value instanceof Timestamp) {
+            return value.toString();
+        }
+        
+        // Handle standard SQL DATE
+        if (value instanceof Date) {
+            return value.toString();
+        }
+        
+        // Handle CLOB (Character Large Object)
+        if (value instanceof Clob) {
+            try {
+                Clob clob = (Clob) value;
+                return clob.getSubString(1, (int) clob.length());
+            } catch (SQLException e) {
+                return "[CLOB: " + e.getMessage() + "]";
+            }
+        }
+        
+        // Handle BLOB (Binary Large Object) - convert to hex or base64
+        if (value instanceof Blob) {
+            try {
+                Blob blob = (Blob) value;
+                byte[] bytes = blob.getBytes(1, (int) blob.length());
+                return "[BLOB: " + bytes.length + " bytes]";
+            } catch (SQLException e) {
+                return "[BLOB: " + e.getMessage() + "]";
+            }
+        }
+        
+        // Handle Oracle NUMBER types
+        if (value instanceof oracle.sql.NUMBER) {
+            try {
+                oracle.sql.NUMBER number = (oracle.sql.NUMBER) value;
+                return number.bigDecimalValue();
+            } catch (SQLException e) {
+                return value.toString();
+            }
+        }
+        
+        // Handle other Oracle-specific types by converting to string
+        if (value.getClass().getName().startsWith("oracle.sql.")) {
+            return value.toString();
+        }
+        
+        // Return as-is for standard Java types
+        return value;
     }
 }
