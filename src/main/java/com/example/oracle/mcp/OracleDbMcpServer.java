@@ -93,31 +93,27 @@ public class OracleDbMcpServer {
             {
               "type": "object",
               "properties": {
-                "query": {
+                "sql": {
                   "type": "string",
-                  "description": "Natural language request or SQL query. Examples: 'get trade status for trade_id xyz', 'connect to dev DB and show me user data', 'SELECT * FROM table'. The system can intelligently build queries from natural language."
+                  "description": "SQL query to execute. Example: SELECT * FROM AFX_TRADE WHERE TRADE_ID = 'abc'"
                 },
                 "environment": {
                   "type": "string",
-                  "description": "Database environment: dev, uat, or prod (optional, can be inferred from query text)",
+                  "description": "Database environment: dev, uat, prod (optional, defaults to current environment)",
                   "enum": ["dev", "uat", "prod"]
                 },
                 "schema": {
                   "type": "string",
-                  "description": "Database schema name (optional, can be inferred from query text or will use default schema)"
-                },
-                "use_intelligent_query": {
-                  "type": "boolean",
-                  "description": "Whether to use intelligent query building for natural language requests (default: true)"
+                  "description": "Database schema name (optional, defaults to current schema)"
                 }
               },
-              "required": ["query"]
+              "required": ["sql"]
             }
             """;
             
         McpSchema.Tool executeQueryTool = new McpSchema.Tool(
             "execute_query",
-            "Execute queries against Oracle database with intelligent natural language processing. Can build SQL from requests like 'get trade status for trade_id xyz' or execute direct SQL. Supports multi-environment and multi-schema operations.",
+            "Execute SQL SELECT queries against Oracle database. Copilot should build the SQL query and pass it to this tool.",
             schema
         );
         
