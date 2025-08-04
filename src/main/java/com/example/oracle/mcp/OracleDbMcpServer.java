@@ -126,21 +126,17 @@ public class OracleDbMcpServer {
             (exchange, arguments) -> {
                 try {
                     String sql = (String) arguments.get("sql");
-                    String environmentParam = (String) arguments.get("environment");
-                    String schemaParam = (String) arguments.get("schema");
                     
                     if (sql == null || sql.trim().isEmpty()) {
                         return new McpSchema.CallToolResult(
-                            "SQL parameter is required and cannot be empty",
+                            "sql parameter is required",
                             true
                         );
                     }
                     
-                    // Parse environment and schema
-                    Environment environment = environmentParam != null ? 
-                        Environment.fromString(environmentParam) : connectionManager.getCurrentEnvironment();
-                    Schema selectedSchema = schemaParam != null ? 
-                        config.findSchemaByName(schemaParam) : connectionManager.getCurrentSchema();
+                    // Use current environment and schema
+                    Environment environment = connectionManager.getCurrentEnvironment();
+                    Schema selectedSchema = connectionManager.getCurrentSchema();
                     
                     // Security check: only allow SELECT statements
                     String upperSql = sql.trim().toUpperCase();
@@ -193,28 +189,18 @@ public class OracleDbMcpServer {
             {
               "type": "object",
               "properties": {
-                "query": {
+                "sql": {
                   "type": "string",
-                  "description": "The SQL query to analyze with EXPLAIN PLAN. You can specify environment and schema in natural language."
-                },
-                "environment": {
-                  "type": "string",
-                  "description": "Database environment: dev, uat, or prod (optional)",
-                  "enum": ["dev", "uat", "prod"]
-                },
-                "schema": {
-                  "type": "string",
-                  "description": "Database schema: AFX (default) or AFX_WF (optional)",
-                  "enum": ["AFX", "AFX_WF"]
+                  "description": "SQL query to analyze. Example: SELECT * FROM AFX_TRADE WHERE TRADE_ID = 'abc'"
                 }
               },
-              "required": ["query"]
+              "required": ["sql"]
             }
             """;
             
         McpSchema.Tool explainPlanTool = new McpSchema.Tool(
             "explain_plan",
-            "Generate and analyze the execution plan for a SQL query to help with optimization. Supports environment and schema selection through natural language.",
+            "Generate execution plan for a SQL query to analyze performance.",
             schema
         );
         
@@ -222,37 +208,31 @@ public class OracleDbMcpServer {
             explainPlanTool,
             (exchange, arguments) -> {
                 try {
-                    String query = (String) arguments.get("query");
-                    String environmentParam = (String) arguments.get("environment");
-                    String schemaParam = (String) arguments.get("schema");
+                    String sql = (String) arguments.get("sql");
                     
-                    if (query == null || query.trim().isEmpty()) {
+                    if (sql == null || sql.trim().isEmpty()) {
                         return new McpSchema.CallToolResult(
-                            "Query parameter is required and cannot be empty",
+                            "sql parameter is required",
                             true
                         );
                     }
                     
-                    // Parse environment and schema from natural language
-                    Environment environment = parseEnvironment(query, environmentParam);
-                    Schema selectedSchema = parseSchema(query, schemaParam);
+                    // Use current environment and schema
+                    Environment environment = connectionManager.getCurrentEnvironment();
+                    Schema selectedSchema = connectionManager.getCurrentSchema();
                     
-                    // Extract SQL from natural language if needed
-                    String cleanQuery = extractSqlFromText(query);
+                    // Use the SQL query directly
+                    String cleanQuery = sql;
                     
-                    // Switch to the specified environment
-                    connectionManager.switchEnvironment(environment);
-                    connectionManager.switchSchema(selectedSchema);
-                    
-                    // Generate execution plan
-                    String executionPlan = connectionManager.getExecutionPlan(cleanQuery);
+                    // Generate execution plan using current environment/schema
+                    String explainPlan = connectionManager.getExecutionPlan(cleanQuery);
                     
                     Map<String, Object> response = new HashMap<>();
                     response.put("operation", "explain_plan");
                     response.put("environment", environment.getKey());
                     response.put("schema", selectedSchema.getName());
-                    response.put("query", cleanQuery);
-                    response.put("execution_plan", executionPlan);
+                    response.put("sql", cleanQuery);
+                    response.put("execution_plan", explainPlan);
                     
                     ObjectMapper mapper = new ObjectMapper();
                     String jsonResponse = mapper.writeValueAsString(response);
@@ -284,38 +264,13 @@ public class OracleDbMcpServer {
         String schema = """
             {
               "type": "object",
-              "properties": {
-                "request": {
-                  "type": "string",
-                  "description": "Natural language request for schema information. Examples: 'show AFX tables', 'list AFX_WF views', 'describe schema in prod environment'"
-                },
-                "environment": {
-                  "type": "string",
-                  "description": "Database environment: dev, uat, or prod (optional)",
-                  "enum": ["dev", "uat", "prod"]
-                },
-                "schema": {
-                  "type": "string",
-                  "description": "Database schema: AFX (default) or AFX_WF (optional)",
-                  "enum": ["AFX", "AFX_WF"]
-                },
-                "object_type": {
-                  "type": "string",
-                  "description": "Type of database objects to list",
-                  "enum": ["TABLE", "VIEW", "INDEX", "ALL"]
-                },
-                "table_pattern": {
-                  "type": "string",
-                  "description": "Pattern to filter table names (optional)"
-                }
-              },
-              "required": ["request"]
+              "properties": {}
             }
             """;
             
         McpSchema.Tool getSchemaInfoTool = new McpSchema.Tool(
             "get_schema_info",
-            "Get information about database schema objects (tables, views, indexes, etc.). Supports natural language requests and can work across different environments and schemas.",
+            "Get complete information about the current database schema including all tables and views.",
             schema
         );
         
@@ -323,25 +278,9 @@ public class OracleDbMcpServer {
             getSchemaInfoTool,
             (exchange, arguments) -> {
                 try {
-                    String request = (String) arguments.get("request");
-                    String environmentParam = (String) arguments.get("environment");
-                    String schemaParam = (String) arguments.get("schema");
-                    String objectType = (String) arguments.get("object_type");
-                    String tablePattern = (String) arguments.get("table_pattern");
-                    
-                    if (request == null || request.trim().isEmpty()) {
-                        return new McpSchema.CallToolResult(
-                            "Request parameter is required and cannot be empty",
-                            true
-                        );
-                    }
-                    
-                    // Parse environment and schema from natural language
-                    Environment environment = parseEnvironment(request, environmentParam);
-                    Schema selectedSchema = parseSchema(request, schemaParam);
-                    
-                    // Switch to the specified environment
-                    connectionManager.switchEnvironment(environment);
+                    // No arguments needed - use current environment and schema
+                    Environment environment = connectionManager.getCurrentEnvironment();
+                    Schema selectedSchema = connectionManager.getCurrentSchema();
                     
                     // Get schema information
                     SchemaInfo schemaInfo = connectionManager.getSchemaInfo(selectedSchema);
@@ -350,14 +289,12 @@ public class OracleDbMcpServer {
                     response.put("operation", "get_schema_info");
                     response.put("environment", environment.getKey());
                     response.put("schema", selectedSchema.getName());
-                    response.put("request", request);
+                    response.put("current_schema", selectedSchema.getName());
                     response.put("schema_info", schemaInfo.toMap());
                     
-                    // Filter results if pattern provided
-                    if (tablePattern != null && !tablePattern.trim().isEmpty()) {
-                        List<SchemaInfo.TableInfo> filteredTables = schemaInfo.findTables(tablePattern);
-                        response.put("filtered_tables", filteredTables.stream().map(SchemaInfo.TableInfo::toMap).toList());
-                    }
+                    // Add table count for quick reference
+                    response.put("table_count", schemaInfo.getTables().size());
+                    response.put("view_count", schemaInfo.getViews().size());
                     
                     ObjectMapper mapper = new ObjectMapper();
                     String jsonResponse = mapper.writeValueAsString(response);
@@ -390,23 +327,19 @@ public class OracleDbMcpServer {
             {
               "type": "object",
               "properties": {
-                "request": {
-                  "type": "string",
-                  "description": "Natural language request to connect to an environment. Examples: 'connect to dev', 'switch to production', 'use UAT database'"
-                },
                 "environment": {
                   "type": "string",
-                  "description": "Specific environment to connect to (optional if specified in request)",
+                  "description": "Database environment to connect to",
                   "enum": ["dev", "uat", "prod"]
                 }
               },
-              "required": ["request"]
+              "required": ["environment"]
             }
             """;
             
         McpSchema.Tool connectTool = new McpSchema.Tool(
             "connect_to_environment",
-            "Connect to a specific database environment (dev, uat, prod). Supports natural language requests.",
+            "Connect to a database environment: dev, uat, or prod.",
             schema
         );
         
@@ -414,18 +347,17 @@ public class OracleDbMcpServer {
             connectTool,
             (exchange, arguments) -> {
                 try {
-                    String request = (String) arguments.get("request");
                     String environmentParam = (String) arguments.get("environment");
                     
-                    if (request == null || request.trim().isEmpty()) {
+                    if (environmentParam == null || environmentParam.trim().isEmpty()) {
                         return new McpSchema.CallToolResult(
-                            "Request parameter is required and cannot be empty",
+                            "environment parameter is required",
                             true
                         );
                     }
                     
-                    // Parse environment from natural language
-                    Environment environment = parseEnvironment(request, environmentParam);
+                    // Parse environment directly
+                    Environment environment = Environment.fromString(environmentParam);
                     
                     // Test connection with timeout handling
                     boolean connected;
@@ -477,18 +409,13 @@ public class OracleDbMcpServer {
         String schema = """
             {
               "type": "object",
-              "properties": {
-                "include_schema_info": {
-                  "type": "boolean",
-                  "description": "Whether to include current schema information (default: false)"
-                }
-              }
+              "properties": {}
             }
             """;
             
         McpSchema.Tool statusTool = new McpSchema.Tool(
             "get_current_status",
-            "Get the current connection status including environment, schema, and connection health.",
+            "Get the current connection status and environment information.",
             schema
         );
         
@@ -496,8 +423,7 @@ public class OracleDbMcpServer {
             statusTool,
             (exchange, arguments) -> {
                 try {
-                    Boolean includeSchemaInfo = (Boolean) arguments.get("include_schema_info");
-                    if (includeSchemaInfo == null) includeSchemaInfo = false;
+                    // No arguments needed
                     
                     Environment currentEnv = connectionManager.getCurrentEnvironment();
                     Schema currentSchema = connectionManager.getCurrentSchema();
@@ -512,12 +438,12 @@ public class OracleDbMcpServer {
                     boolean isConnected = connectionManager.testConnection(currentEnv);
                     response.put("connection_status", isConnected ? "connected" : "disconnected");
                     
-                    if (includeSchemaInfo && isConnected) {
+                    if (isConnected) {
                         try {
                             SchemaInfo schemaInfo = connectionManager.getSchemaInfo(currentSchema);
                             response.put("schema_summary", Map.of(
-                                "table_count", schemaInfo.getMetadata().get("table_count"),
-                                "view_count", schemaInfo.getMetadata().get("view_count")
+                                "table_count", schemaInfo.getTables().size(),
+                                "view_count", schemaInfo.getViews().size()
                             ));
                         } catch (SQLException e) {
                             response.put("schema_summary", "Error retrieving schema info: " + e.getMessage());
@@ -550,27 +476,18 @@ public class OracleDbMcpServer {
             {
               "type": "object",
               "properties": {
-                "search_pattern": {
+                "keyword": {
                   "type": "string",
-                  "description": "Search pattern to find relevant tables. Examples: 'trade', 'user', 'order', 'transaction'"
-                },
-                "environment": {
-                  "type": "string",
-                  "description": "Database environment: dev, uat, or prod (optional)",
-                  "enum": ["dev", "uat", "prod"]
-                },
-                "schema": {
-                  "type": "string",
-                  "description": "Database schema name (optional, searches all schemas if not specified)"
+                  "description": "Search keyword to find tables. Examples: trade, user, order, customer"
                 }
               },
-              "required": ["search_pattern"]
+              "required": ["keyword"]
             }
             """;
             
         McpSchema.Tool searchTablesTool = new McpSchema.Tool(
             "search_tables",
-            "Search for database tables that match a pattern. Use this to discover which tables might contain the data you need before building SQL queries.",
+            "Search for database tables by keyword to find relevant tables.",
             schema
         );
         
@@ -578,34 +495,26 @@ public class OracleDbMcpServer {
             searchTablesTool,
             (exchange, arguments) -> {
                 try {
-                    String searchPattern = (String) arguments.get("search_pattern");
-                    String environmentParam = (String) arguments.get("environment");
-                    String schemaParam = (String) arguments.get("schema");
+                    String keyword = (String) arguments.get("keyword");
                     
-                    if (searchPattern == null || searchPattern.trim().isEmpty()) {
+                    if (keyword == null || keyword.trim().isEmpty()) {
                         return new McpSchema.CallToolResult(
-                            "search_pattern parameter is required and cannot be empty",
+                            "keyword parameter is required",
                             true
                         );
                     }
                     
-                    // Parse environment and schema
-                    Environment environment = environmentParam != null ? 
-                        Environment.fromString(environmentParam) : connectionManager.getCurrentEnvironment();
-                    Schema targetSchema = schemaParam != null ? 
-                        config.findSchemaByName(schemaParam) : null;
-                    
-                    // Switch to specified environment
-                    connectionManager.switchEnvironment(environment);
+                    // Use current environment and search all schemas
+                    Environment environment = connectionManager.getCurrentEnvironment();
                     
                     // Search for tables
-                    List<TableSearchResult> results = connectionManager.searchTables(searchPattern, targetSchema);
+                    List<TableSearchResult> results = connectionManager.searchTables(keyword, null);
                     
                     Map<String, Object> response = new HashMap<>();
                     response.put("operation", "search_tables");
-                    response.put("search_pattern", searchPattern);
+                    response.put("search_keyword", keyword);
                     response.put("environment", environment.getKey());
-                    response.put("target_schema", targetSchema != null ? targetSchema.getName() : "all_schemas");
+                    response.put("target_schema", "all_schemas");
                     response.put("found_tables", results.stream().map(TableSearchResult::toMap).toList());
                     response.put("table_count", results.size());
                     
@@ -647,27 +556,18 @@ public class OracleDbMcpServer {
             {
               "type": "object",
               "properties": {
-                "table_name": {
+                "table": {
                   "type": "string",
-                  "description": "Full table name in format SCHEMA.TABLE_NAME or just TABLE_NAME"
-                },
-                "environment": {
-                  "type": "string",
-                  "description": "Database environment: dev, uat, or prod (optional)",
-                  "enum": ["dev", "uat", "prod"]
-                },
-                "schema": {
-                  "type": "string",
-                  "description": "Database schema name (optional if included in table_name)"
+                  "description": "Table name like AFX_TRADE or SCHEMA.TABLE_NAME"
                 }
               },
-              "required": ["table_name"]
+              "required": ["table"]
             }
             """;
             
         McpSchema.Tool getTableDetailsTool = new McpSchema.Tool(
             "get_table_details",
-            "Get detailed information about a specific table including all columns, data types, and constraints. Use this after search_tables to get full column information for building SQL queries.",
+            "Get detailed information about a table including all columns and data types.",
             schema
         );
         
@@ -675,43 +575,37 @@ public class OracleDbMcpServer {
             getTableDetailsTool,
             (exchange, arguments) -> {
                 try {
-                    String tableName = (String) arguments.get("table_name");
-                    String environmentParam = (String) arguments.get("environment");
-                    String schemaParam = (String) arguments.get("schema");
+                    String table = (String) arguments.get("table");
                     
-                    if (tableName == null || tableName.trim().isEmpty()) {
+                    if (table == null || table.trim().isEmpty()) {
                         return new McpSchema.CallToolResult(
-                            "table_name parameter is required and cannot be empty",
+                            "table parameter is required",
                             true
                         );
                     }
                     
-                    // Parse environment
-                    Environment environment = environmentParam != null ? 
-                        Environment.fromString(environmentParam) : connectionManager.getCurrentEnvironment();
+                    // Use current environment
+                    Environment environment = connectionManager.getCurrentEnvironment();
                     
                     // Parse schema and table name
                     String actualSchemaName;
                     String actualTableName;
                     
-                    if (tableName.contains(".")) {
-                        String[] parts = tableName.split("\\\\.", 2);
+                    if (table.contains(".")) {
+                        String[] parts = table.split("\\\\.", 2);
                         actualSchemaName = parts[0];
                         actualTableName = parts[1];
                     } else {
-                        actualSchemaName = schemaParam != null ? schemaParam : connectionManager.getCurrentSchema().getName();
-                        actualTableName = tableName;
+                        actualSchemaName = connectionManager.getCurrentSchema().getName();
+                        actualTableName = table;
                     }
                     
                     Schema targetSchema = config.findSchemaByName(actualSchemaName);
                     
-                    // Switch to specified environment
-                    connectionManager.switchEnvironment(environment);
-                    
                     // Get schema info and find the specific table
                     SchemaInfo schemaInfo = connectionManager.getSchemaInfo(targetSchema);
                     SchemaInfo.TableInfo tableInfo = schemaInfo.getTables().stream()
-                            .filter(table -> table.getName().equalsIgnoreCase(actualTableName))
+                            .filter(tbl -> tbl.getName().equalsIgnoreCase(actualTableName))
                             .findFirst()
                             .orElse(null);
                     
