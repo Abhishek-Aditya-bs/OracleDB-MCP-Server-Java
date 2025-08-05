@@ -2,19 +2,19 @@
 
 A Model Context Protocol (MCP) server implementation for Oracle Database integration. This server enables AI assistants (GitHub Copilot, Claude Desktop, ChatGPT, etc.) to interact with Oracle databases by providing the tools needed for intelligent query discovery and execution.
 
-## 🧠 **Simplified Architecture for AI Assistants**
+## 🧠 **Architecture Overview**
 
-This server follows a **streamlined MCP architecture** where:
+This server implements a streamlined MCP architecture that optimizes the division of responsibilities:
 
-- **🤖 AI Assistant provides ALL the intelligence**: Natural language understanding, query building, table discovery, and decision making
-- **🔧 Our server provides ONLY the essentials**: Database connection management and SQL execution
-- **⚡ Ultra-simple collaboration**: AI Assistant builds complete SQL → executes via our server
+- **🤖 AI Assistant**: Handles natural language understanding, query building, table discovery, and decision making
+- **🔧 MCP Server**: Provides database connection management and SQL execution capabilities
+- **⚡ Efficient Integration**: AI Assistant constructs complete SQL queries and executes them through the server
 
 ### **Example Workflow with GitHub Copilot**
-1. **User asks Copilot**: *"Can you please get me the status of Trade ID = 'abc123'?"*
-2. **Copilot uses its intelligence**: Builds SQL like `SELECT TRADE_ID, TRADE_STATUS FROM SCHEMA.TRADE_TABLE WHERE TRADE_ID = 'abc123'`
-3. **Copilot uses our `execute_query` tool**: Executes the SQL and gets results
-4. **Done!** - Simple, fast, and reliable
+1. **User Request**: *"Can you please get me the status of Trade ID = 'abc123'?"*
+2. **AI Processing**: Copilot analyzes the request and builds SQL: `SELECT TRADE_ID, TRADE_STATUS FROM SCHEMA.TRADE_TABLE WHERE TRADE_ID = 'abc123'`
+3. **Query Execution**: Copilot uses the `execute_query` tool to execute the SQL and retrieve results
+4. **Response**: Results are returned to the user in a formatted manner
 
 ## ⚠️ **IMPORTANT: Kerberos Authentication Only**
 
@@ -36,7 +36,7 @@ This server follows a **streamlined MCP architecture** where:
 
 ## Features
 
-- **⚡ Ultra-Simple Query Execution**: Execute any SQL built by AI assistants
+- **⚡ Query Execution**: Execute SQL built by AI assistants
 - **🌍 Multi-Environment Support**: Connect to Development, UAT, and Production environments  
 - **🔗 Dynamic Schema Support**: Configurable schemas (no hardcoded values)
 - **🔄 Connection Management**: Intelligent connection pooling and environment switching
@@ -45,7 +45,7 @@ This server follows a **streamlined MCP architecture** where:
 - **🛡️ Security First**: Only allows SELECT statements for safe database interaction
 - **⚙️ Externalized Configuration**: Easy configuration management through properties files
 - **📋 MCP Protocol Compliance**: Full adherence to Model Context Protocol specifications
-- **🚀 Read-Only Database Support**: Works perfectly with Oracle Active Data Guard standby databases
+- **🚀 Read-Only Database Support**: Compatible with Oracle Active Data Guard standby databases
 
 ## Prerequisites
 
@@ -199,7 +199,7 @@ The `database.properties` file contains **placeholder values** that must be repl
      }
    }
    ```
-   **Result**: Returns the trade status data immediately!
+   **Result**: Returns the trade status data
 
 ### **Example: User asks for user information**
 
@@ -226,16 +226,16 @@ The `database.properties` file contains **placeholder values** that must be repl
      }
    }
    ```
-   **Result**: Returns all active users immediately!
+   **Result**: Returns all active users
 
-## 🎉 **Simplified Architecture Benefits**
+## 🎉 **Architecture Benefits**
 
-- **⚡ Lightning Fast**: No complex tool chains - just build SQL and execute
-- **🧠 AI Assistant handles ALL complexity**: Table discovery, query building, optimization
-- **🔧 Our server does ONE thing well**: Execute SQL safely and efficiently
-- **🚀 Ultra Reliable**: Fewer moving parts = fewer things that can break
-- **🔒 Maximum Security**: Simple SELECT-only validation, works with read-only databases
-- **🔄 Zero Maintenance**: AI Assistant intelligence evolves, our server stays stable
+- **⚡ High Performance**: Direct SQL execution without complex tool chains
+- **🧠 Intelligent Division of Labor**: AI Assistant handles complexity while server focuses on database operations
+- **🔧 Focused Functionality**: Dedicated to secure and efficient SQL execution
+- **🚀 High Reliability**: Simplified architecture reduces potential failure points
+- **🔒 Enhanced Security**: SELECT-only validation with support for read-only databases
+- **🔄 Low Maintenance**: Stable server design while AI Assistant capabilities continue to evolve
 
 ## Security Considerations
 
@@ -251,27 +251,27 @@ The `database.properties` file contains **placeholder values** that must be repl
 - **Responsibility**: If you extend beyond SELECT, ensure proper access controls and testing
 
 ### 🔒 **Additional Security Features**
-- **🚀 Read-only database support**: Perfect for Oracle Active Data Guard standby databases
-- **🛡️ Simple but effective SQL validation**: SELECT-only check prevents data modification
-- **🔐 Enterprise authentication**: Kerberos-only authentication for maximum security
-- **⏱️ Connection timeouts**: Prevent hanging connections and resource exhaustion
-- **🔒 Zero SQL injection risk**: Simple validation approach eliminates complex attack vectors
+- **🚀 Read-only database support**: Compatible with Oracle Active Data Guard standby databases
+- **🛡️ Effective SQL validation**: SELECT-only validation prevents data modification
+- **🔐 Enterprise authentication**: Kerberos-only authentication for enterprise security
+- **⏱️ Connection timeouts**: Prevents hanging connections and resource exhaustion
+- **🔒 SQL injection protection**: Validation approach minimizes attack vectors
 
 ## Development Status
 
 This project is feature-complete and ready for use with proper database configuration.
 
 ### Current Status:
-- ✅ **🚀 Ultra-simplified MCP architecture** - Just 3 essential tools
-- ✅ **⚡ Lightning-fast query execution** - AI Assistant builds SQL, we execute it
-- ✅ **🔒 Read-only database support** - Perfect for Oracle Active Data Guard standby
-- ✅ **🛡️ Bulletproof security** - Simple SELECT-only validation
-- ✅ **🌍 Multi-environment support** - Dev, UAT, Production switching
-- ✅ **🔐 Kerberos-only authentication** - Enterprise-grade security
-- ✅ **⚙️ Externalized configuration** - Easy deployment across environments
-- ✅ **📋 Full MCP protocol compliance** - Works with any MCP client
-- ✅ **🔄 Robust connection management** - Pooling, timeouts, error handling
-- ✅ **📊 Real-time status monitoring** - Connection health and schema info
+- ✅ **🚀 Streamlined MCP architecture** - 3 essential tools for optimal performance
+- ✅ **⚡ High-performance query execution** - AI Assistant builds SQL, server executes efficiently
+- ✅ **🔒 Read-only database support** - Compatible with Oracle Active Data Guard standby
+- ✅ **🛡️ Robust security** - SELECT-only validation with comprehensive protection
+- ✅ **🌍 Multi-environment support** - Development, UAT, and Production environment switching
+- ✅ **🔐 Kerberos-only authentication** - Enterprise-grade security implementation
+- ✅ **⚙️ Externalized configuration** - Flexible deployment across environments
+- ✅ **📋 Full MCP protocol compliance** - Compatible with any MCP client
+- ✅ **🔄 Robust connection management** - Connection pooling, timeouts, and error handling
+- ✅ **📊 Real-time status monitoring** - Connection health and schema information
 
 ### 🎉 Usage Examples (GitHub Copilot, Claude Desktop, etc.):
 
@@ -317,24 +317,4 @@ For issues related to:
 
 ---
 
-*This ultra-simplified server provides the perfect foundation for AI assistants to interact with Oracle databases - fast, secure, and reliable!* 🚀
-
-## 🎯 **Why This Simplified Architecture Works Better**
-
-### **❌ What We Removed (And Why)**
-- **Complex table discovery tools** → AI assistants have built-in intelligence for this
-- **Schema exploration tools** → AI assistants can figure out table structures
-- **Query optimization tools** → AI assistants handle optimization internally
-- **Complex SQL parsing** → Caused ORA-00911 errors and compatibility issues
-
-### **✅ What We Kept (The Essentials)**
-- **Simple SQL execution** → The core functionality that actually works
-- **Environment switching** → Essential for multi-environment workflows  
-- **Connection management** → Robust, reliable database connectivity
-- **Status monitoring** → Know what's connected and working
-
-### **🚀 Result: Ultra-Reliable Database Access**
-- **Zero tool failures** → Simple tools that always work
-- **Lightning fast** → No complex tool chains or discovery phases
-- **AI-assistant friendly** → Let AI do what AI does best
-- **Production ready** → Works perfectly with read-only databases
+*This server provides the perfect foundation for AI assistants to interact with Oracle databases - fast, secure, and reliable!* 🚀
