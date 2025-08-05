@@ -58,6 +58,8 @@ public class OracleDbMcpServer {
             server.addTool(createGetSchemaInfoTool());
             server.addTool(createConnectToEnvironmentTool());
             server.addTool(createGetCurrentStatusTool());
+            server.addTool(createSearchTablesToolTool());
+            server.addTool(createGetTableDetailsToolTool());
             
             // Keep the server running
             System.err.println("Oracle DB MCP Server started. Waiting for requests...");
@@ -95,7 +97,7 @@ public class OracleDbMcpServer {
               "properties": {
                 "sql": {
                   "type": "string",
-                  "description": "SQL query to execute. Example: SELECT * FROM SCHEMA.TABLE_NAME WHERE ID = 'value'"
+                  "description": "SQL query to execute. Do NOT include schema prefixes - they will be added automatically. Example: SELECT * FROM TABLE_NAME WHERE ID = 'value'"
                 },
                 "environment": {
                   "type": "string",
@@ -132,13 +134,11 @@ public class OracleDbMcpServer {
                         );
                     }
                     
-                    // Determine environment and schema
-                    Environment environment = environmentParam != null ?
-                        Environment.fromString(environmentParam) : connectionManager.getCurrentEnvironment();
-                    Schema selectedSchema = schemaParam != null ?
-                        config.findSchemaByName(schemaParam) : connectionManager.getCurrentSchema();
+                    // Use current environment and schema
+                    Environment environment = connectionManager.getCurrentEnvironment();
+                    Schema selectedSchema = connectionManager.getCurrentSchema();
                     
-                    // Basic security check: only allow SELECT statements
+                    // Security check: only allow SELECT statements
                     String upperSql = sql.trim().toUpperCase();
                     if (!upperSql.startsWith("SELECT")) {
                         return new McpSchema.CallToolResult(
@@ -147,18 +147,14 @@ public class OracleDbMcpServer {
                         );
                     }
                     
-                    // Auto-prefix table names with schema if missing
-                    String prefixedSql = addSchemaPrefix(sql, selectedSchema);
-                    
-                    // Execute the query
-                    QueryResult result = connectionManager.executeQuery(prefixedSql, environment, selectedSchema);
+                    // Execute the query directly (no modifications)
+                    QueryResult result = connectionManager.executeQuery(sql, environment, selectedSchema);
                     
                     Map<String, Object> response = new HashMap<>();
                     response.put("operation", "execute_query");
                     response.put("environment", environment.getKey());
                     response.put("schema", selectedSchema.getName());
-                    response.put("original_sql", sql);
-                    response.put("executed_sql", prefixedSql);
+                    response.put("executed_sql", sql);
                     response.put("result", result.toMap());
                     response.put("formatted_result", result.toFormattedString());
                     
@@ -195,7 +191,7 @@ public class OracleDbMcpServer {
               "properties": {
                 "sql": {
                   "type": "string",
-                  "description": "SQL query to analyze. Example: SELECT * FROM SCHEMA.TABLE_NAME WHERE ID = 'value'"
+                  "description": "SQL query to analyze. Do NOT include schema prefixes - they will be added automatically. Example: SELECT * FROM TABLE_NAME WHERE ID = 'value'"
                 }
               },
               "required": ["sql"]
@@ -221,21 +217,12 @@ public class OracleDbMcpServer {
                         );
                     }
                     
-                    // Basic security check: only allow SELECT statements
-                    String upperSql = sql.trim().toUpperCase();
-                    if (!upperSql.startsWith("SELECT")) {
-                        return new McpSchema.CallToolResult(
-                            "Only SELECT queries are allowed for security reasons. Query must start with SELECT.",
-                            true
-                        );
-                    }
-                    
                     // Use current environment and schema
                     Environment environment = connectionManager.getCurrentEnvironment();
                     Schema selectedSchema = connectionManager.getCurrentSchema();
                     
-                    // Auto-prefix table names with schema if missing
-                    String cleanQuery = addSchemaPrefix(sql, selectedSchema);
+                    // Use the SQL query directly
+                    String cleanQuery = sql;
                     
                     // Generate execution plan using current environment/schema
                     String explainPlan = connectionManager.getExecutionPlan(cleanQuery);
@@ -758,52 +745,7 @@ public class OracleDbMcpServer {
         return trimmed;
     }
     
-    /**
-     * Automatically add schema prefix to table names that don't already have one.
-     * Converts: SELECT * FROM TABLE_NAME to SELECT * FROM SCHEMA.TABLE_NAME
-     * Excludes Oracle system tables and views.
-     */
-    private static String addSchemaPrefix(String sql, Schema schema) {
-        if (sql == null || schema == null) {
-            return sql;
-        }
-        
-        String schemaName = schema.getName();
-        if (schemaName == null || schemaName.trim().isEmpty()) {
-            return sql;
-        }
-        
-        // Don't modify queries that reference Oracle system objects
-        String upperSql = sql.toUpperCase();
-        if (upperSql.contains("DUAL") || 
-            upperSql.contains("ALL_TABLES") || 
-            upperSql.contains("ALL_TAB_COLUMNS") ||
-            upperSql.contains("ALL_VIEWS") ||
-            upperSql.contains("ALL_OBJECTS") ||
-            upperSql.contains("USER_TABLES") ||
-            upperSql.contains("USER_TAB_COLUMNS") ||
-            upperSql.contains("USER_VIEWS") ||
-            upperSql.contains("USER_OBJECTS") ||
-            upperSql.contains("DBA_") ||
-            upperSql.contains("V$") ||
-            upperSql.contains("SYS.") ||
-            upperSql.contains("SYSTEM.")) {
-            return sql; // Return unchanged for system queries
-        }
-        
-        // Simple regex-based approach to add schema prefix
-        // This handles common cases: FROM table_name, JOIN table_name, etc.
-        String result = sql;
-        
-        // Pattern to match table references after FROM, JOIN, etc.
-        // Matches table names but excludes those already prefixed with schema
-        // Handles: letters, numbers, underscores, and dollar signs (Oracle identifiers)
-        String pattern = "(?i)\\b(FROM|JOIN|UPDATE|INSERT\\s+INTO)\\s+([A-Za-z_$][A-Za-z0-9_$#]*)(?!\\.)";
-        
-        result = result.replaceAll(pattern, "$1 " + schemaName + ".$2");
-        
-        return result;
-    }
+
     
 
 }
