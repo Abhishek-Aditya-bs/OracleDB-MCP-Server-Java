@@ -97,16 +97,7 @@ public class OracleDbMcpServer {
               "properties": {
                 "sql": {
                   "type": "string",
-                  "description": "SQL query to execute. Do NOT include schema prefixes - they will be added automatically. Example: SELECT * FROM TABLE_NAME WHERE ID = 'value'"
-                },
-                "environment": {
-                  "type": "string",
-                  "description": "Database environment: dev, uat, prod (optional, defaults to current environment)",
-                  "enum": ["dev", "uat", "prod"]
-                },
-                "schema": {
-                  "type": "string",
-                  "description": "Database schema name (optional, defaults to current schema)"
+                  "description": "SQL query to execute. Include schema prefixes as needed. Example: SELECT * FROM SCHEMA.TABLE_NAME WHERE ID = 'value'"
                 }
               },
               "required": ["sql"]
@@ -115,7 +106,7 @@ public class OracleDbMcpServer {
             
         McpSchema.Tool executeQueryTool = new McpSchema.Tool(
             "execute_query",
-            "Execute optimized SQL SELECT queries against Oracle database. IMPORTANT: Before building queries, you should: 1) Use search_tables to find relevant tables, 2) Use get_table_details to understand table structure, 3) Build efficient queries with proper WHERE clauses, indexes, and LIMIT when appropriate, 4) Avoid SELECT * for large tables - specify needed columns only.",
+            "Execute SQL SELECT queries against the current Oracle database environment and schema. AI assistants should build complete SQL queries with schema prefixes (e.g., SCHEMA.TABLE_NAME) and pass them to this tool. Use search_tables and get_table_details first to understand the database structure.",
             schema
         );
         
@@ -124,8 +115,6 @@ public class OracleDbMcpServer {
             (exchange, arguments) -> {
                 try {
                     String sql = (String) arguments.get("sql");
-                    String environmentParam = (String) arguments.get("environment");
-                    String schemaParam = (String) arguments.get("schema");
                     
                     if (sql == null || sql.trim().isEmpty()) {
                         return new McpSchema.CallToolResult(
@@ -191,7 +180,7 @@ public class OracleDbMcpServer {
               "properties": {
                 "sql": {
                   "type": "string",
-                  "description": "SQL query to analyze. Do NOT include schema prefixes - they will be added automatically. Example: SELECT * FROM TABLE_NAME WHERE ID = 'value'"
+                  "description": "SQL query to analyze. Include schema prefixes as needed. Example: SELECT * FROM SCHEMA.TABLE_NAME WHERE ID = 'value'"
                 }
               },
               "required": ["sql"]
