@@ -30,11 +30,46 @@ public class SchemaInfo {
      * Load schema information from database connection
      */
     public static SchemaInfo loadSchemaInfo(Connection connection, Schema schema) throws SQLException {
-        List<TableInfo> tables = loadTables(connection, schema);
-        List<ViewInfo> views = loadViews(connection, schema);
-        List<IndexInfo> indexes = loadIndexes(connection, schema);
-        Map<String, Object> metadata = loadSchemaMetadata(connection, schema);
+        System.err.println("DEBUG: Starting loadSchemaInfo for schema: '" + schema.getName() + "'");
         
+        List<TableInfo> tables = null;
+        List<ViewInfo> views = null;
+        List<IndexInfo> indexes = null;
+        Map<String, Object> metadata = null;
+        
+        try {
+            tables = loadTables(connection, schema);
+            System.err.println("DEBUG: Loaded " + tables.size() + " tables");
+        } catch (SQLException e) {
+            System.err.println("ERROR: Failed to load tables: " + e.getMessage());
+            throw e;
+        }
+        
+        try {
+            views = loadViews(connection, schema);
+            System.err.println("DEBUG: Loaded " + views.size() + " views");
+        } catch (SQLException e) {
+            System.err.println("WARNING: Failed to load views (continuing): " + e.getMessage());
+            views = new ArrayList<>(); // Continue with empty views
+        }
+        
+        try {
+            indexes = loadIndexes(connection, schema);
+            System.err.println("DEBUG: Loaded " + indexes.size() + " indexes");
+        } catch (SQLException e) {
+            System.err.println("WARNING: Failed to load indexes (continuing): " + e.getMessage());
+            indexes = new ArrayList<>(); // Continue with empty indexes
+        }
+        
+        try {
+            metadata = loadSchemaMetadata(connection, schema);
+            System.err.println("DEBUG: Loaded metadata");
+        } catch (SQLException e) {
+            System.err.println("WARNING: Failed to load metadata (continuing): " + e.getMessage());
+            metadata = new HashMap<>(); // Continue with empty metadata
+        }
+        
+        System.err.println("DEBUG: Completed loadSchemaInfo for schema: '" + schema.getName() + "'");
         return new SchemaInfo(schema, tables, views, indexes, metadata);
     }
     
@@ -116,7 +151,7 @@ public class SchemaInfo {
                     "ORDER BY view_name";
         
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setString(1, schema.getName());
+            stmt.setString(1, schema.getName().toUpperCase()); // Force uppercase for Oracle
             
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
@@ -140,7 +175,7 @@ public class SchemaInfo {
                     "ORDER BY table_name, index_name";
         
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setString(1, schema.getName());
+            stmt.setString(1, schema.getName().toUpperCase()); // Force uppercase for Oracle
             
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
@@ -163,7 +198,7 @@ public class SchemaInfo {
         // Get table count
         String tableSql = "SELECT COUNT(*) as table_count FROM all_tables WHERE owner = ?";
         try (PreparedStatement stmt = connection.prepareStatement(tableSql)) {
-            stmt.setString(1, schema.getName());
+            stmt.setString(1, schema.getName().toUpperCase()); // Force uppercase for Oracle
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
                     metadata.put("table_count", rs.getInt("table_count"));
@@ -174,7 +209,7 @@ public class SchemaInfo {
         // Get view count
         String viewSql = "SELECT COUNT(*) as view_count FROM all_views WHERE owner = ?";
         try (PreparedStatement stmt = connection.prepareStatement(viewSql)) {
-            stmt.setString(1, schema.getName());
+            stmt.setString(1, schema.getName().toUpperCase()); // Force uppercase for Oracle
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
                     metadata.put("view_count", rs.getInt("view_count"));
