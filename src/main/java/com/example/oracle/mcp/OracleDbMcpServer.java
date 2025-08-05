@@ -19,7 +19,7 @@ import java.sql.*;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Properties;
+
 
 /**
  * Oracle Database MCP Server that provides database query and optimization tools.
@@ -58,8 +58,8 @@ public class OracleDbMcpServer {
             server.addTool(createGetSchemaInfoTool());
             server.addTool(createConnectToEnvironmentTool());
             server.addTool(createGetCurrentStatusTool());
-            server.addTool(createSearchTablesToolTool());
-            server.addTool(createGetTableDetailsToolTool());
+            server.addTool(createSearchTablesTool());
+            server.addTool(createGetTableDetailsTool());
             
             // Keep the server running
             System.err.println("Oracle DB MCP Server started. Waiting for requests...");
@@ -460,7 +460,7 @@ public class OracleDbMcpServer {
     /**
      * Creates the search tables tool specification.
      */
-    private static McpServerFeatures.SyncToolSpecification createSearchTablesToolTool() {
+    private static McpServerFeatures.SyncToolSpecification createSearchTablesTool() {
         String schema = """
             {
               "type": "object",
@@ -471,7 +471,7 @@ public class OracleDbMcpServer {
                 },
                 "environment": {
                   "type": "string",
-                  "description": "Database environment: dev, uat, prod (optional, defaults to dev)",
+                  "description": "Database environment: dev, uat, prod (optional, defaults to current environment)",
                   "enum": ["dev", "uat", "prod"]
                 },
                 "schema": {
@@ -557,7 +557,7 @@ public class OracleDbMcpServer {
     /**
      * Creates the get table details tool specification.
      */
-    private static McpServerFeatures.SyncToolSpecification createGetTableDetailsToolTool() {
+    private static McpServerFeatures.SyncToolSpecification createGetTableDetailsTool() {
         String schema = """
             {
               "type": "object",
@@ -568,7 +568,7 @@ public class OracleDbMcpServer {
                 },
                 "environment": {
                   "type": "string",
-                  "description": "Database environment: dev, uat, prod (optional, defaults to dev)",
+                  "description": "Database environment: dev, uat, prod (optional, defaults to current environment)",
                   "enum": ["dev", "uat", "prod"]
                 },
                 "schema": {
@@ -674,67 +674,4 @@ public class OracleDbMcpServer {
             }
         );
     }
-    
-    // Helper methods for environment and schema parsing
-    
-    /**
-     * Parse environment from natural language and parameter
-     */
-    private static Environment parseEnvironment(String text, String environmentParam) {
-        // First check explicit parameter
-        if (environmentParam != null && !environmentParam.trim().isEmpty()) {
-            return Environment.fromString(environmentParam);
-        }
-        
-        // Then parse from natural language
-        return Environment.parseFromText(text);
-    }
-    
-    /**
-     * Parse schema from natural language and parameter
-     */
-    private static Schema parseSchema(String text, String schemaParam) {
-        DatabaseConfig config = DatabaseConfig.getInstance();
-        
-        // First check explicit parameter
-        if (schemaParam != null && !schemaParam.trim().isEmpty()) {
-            return config.findSchemaByName(schemaParam);
-        }
-        
-        // Then parse from natural language
-        return config.parseSchemaFromText(text);
-    }
-    
-    /**
-     * Extract SQL query from natural language text
-     */
-    private static String extractSqlFromText(String text) {
-        if (text == null) return "";
-        
-        String trimmed = text.trim();
-        
-        // If it already looks like SQL, return as-is
-        String upperText = trimmed.toUpperCase();
-        if (upperText.startsWith("SELECT") || upperText.startsWith("WITH") || 
-            upperText.startsWith("EXPLAIN")) {
-            return trimmed;
-        }
-        
-        // Look for SQL within natural language
-        // This is a simple implementation - could be enhanced with more sophisticated parsing
-        String[] lines = trimmed.split("\\n");
-        for (String line : lines) {
-            String upperLine = line.trim().toUpperCase();
-            if (upperLine.startsWith("SELECT") || upperLine.startsWith("WITH")) {
-                return line.trim();
-            }
-        }
-        
-        // If no clear SQL found, return the original text and let the user fix it
-        return trimmed;
-    }
-    
-
-    
-
 }
