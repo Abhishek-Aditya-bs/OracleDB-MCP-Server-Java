@@ -755,6 +755,7 @@ public class OracleDbMcpServer {
     /**
      * Automatically add schema prefix to table names that don't already have one.
      * Converts: SELECT * FROM TABLE_NAME to SELECT * FROM SCHEMA.TABLE_NAME
+     * Excludes Oracle system tables and views.
      */
     private static String addSchemaPrefix(String sql, Schema schema) {
         if (sql == null || schema == null) {
@@ -766,10 +767,26 @@ public class OracleDbMcpServer {
             return sql;
         }
         
-        // Simple regex-based approach to add schema prefix
-        // This handles common cases: FROM table_name, JOIN table_name, UPDATE table_name, etc.
-        // Note: This is a basic implementation. For production, consider using a SQL parser.
+        // Don't modify queries that reference Oracle system objects
+        String upperSql = sql.toUpperCase();
+        if (upperSql.contains("DUAL") || 
+            upperSql.contains("ALL_TABLES") || 
+            upperSql.contains("ALL_TAB_COLUMNS") ||
+            upperSql.contains("ALL_VIEWS") ||
+            upperSql.contains("ALL_OBJECTS") ||
+            upperSql.contains("USER_TABLES") ||
+            upperSql.contains("USER_TAB_COLUMNS") ||
+            upperSql.contains("USER_VIEWS") ||
+            upperSql.contains("USER_OBJECTS") ||
+            upperSql.contains("DBA_") ||
+            upperSql.contains("V$") ||
+            upperSql.contains("SYS.") ||
+            upperSql.contains("SYSTEM.")) {
+            return sql; // Return unchanged for system queries
+        }
         
+        // Simple regex-based approach to add schema prefix
+        // This handles common cases: FROM table_name, JOIN table_name, etc.
         String result = sql;
         
         // Pattern to match table references after FROM, JOIN, UPDATE, INSERT INTO, etc.
@@ -809,7 +826,7 @@ public class OracleDbMcpServer {
             "COMMIT", "ROLLBACK", "SAVEPOINT",
             "DBMS_", "UTL_", "SYS.", "SYSTEM.", 
             "DUAL;", // Prevent ; after DUAL
-            "--", "/*", "*/", // Block comments (single line comments removed above)
+            "/*", "*/", // Block multi-line comments
             "UNION ALL SELECT", "UNION SELECT", // Prevent UNION-based injection
             "WAITFOR", "SLEEP", "BENCHMARK", "PG_SLEEP", // Time-based attacks
             "XP_", "SP_", // SQL Server extended/system procedures
@@ -854,8 +871,10 @@ public class OracleDbMcpServer {
      * Remove SQL comments from query
      */
     private static String removeComments(String sql) {
-        // Remove single-line comments (-- comment)
-        return sql.replaceAll("--.*$", "").replaceAll("/\\*.*?\\*/", "");
+        // DISABLED: Comment removal was causing SQL corruption (ORA-00911 errors)
+        // The regex "--.*$" was incorrectly matching and corrupting SQL strings
+        // Since AI assistants shouldn't generate SQL with comments anyway, we disable this
+        return sql;
     }
     
     /**
