@@ -138,10 +138,13 @@ public class OracleDbMcpServer {
                     Schema selectedSchema = schemaParam != null ?
                         config.findSchemaByName(schemaParam) : connectionManager.getCurrentSchema();
                     
-                    // Comprehensive security validation
-                    String validationError = validateSqlSecurity(sql);
-                    if (validationError != null) {
-                        return new McpSchema.CallToolResult(validationError, true);
+                    // Basic security check: only allow SELECT statements
+                    String upperSql = sql.trim().toUpperCase();
+                    if (!upperSql.startsWith("SELECT")) {
+                        return new McpSchema.CallToolResult(
+                            "Only SELECT queries are allowed for security reasons. Query must start with SELECT.",
+                            true
+                        );
                     }
                     
                     // Auto-prefix table names with schema if missing
@@ -218,10 +221,13 @@ public class OracleDbMcpServer {
                         );
                     }
                     
-                    // Comprehensive security validation
-                    String validationError = validateSqlSecurity(sql);
-                    if (validationError != null) {
-                        return new McpSchema.CallToolResult(validationError, true);
+                    // Basic security check: only allow SELECT statements
+                    String upperSql = sql.trim().toUpperCase();
+                    if (!upperSql.startsWith("SELECT")) {
+                        return new McpSchema.CallToolResult(
+                            "Only SELECT queries are allowed for security reasons. Query must start with SELECT.",
+                            true
+                        );
                     }
                     
                     // Use current environment and schema
@@ -799,95 +805,5 @@ public class OracleDbMcpServer {
         return result;
     }
     
-    /**
-     * Comprehensive SQL security validation to prevent injection attacks
-     * and ensure only safe SELECT queries are executed.
-     */
-    private static String validateSqlSecurity(String sql) {
-        if (sql == null || sql.trim().isEmpty()) {
-            return "SQL query cannot be empty";
-        }
-        
-        String cleanSql = sql.trim();
-        String upperSql = cleanSql.toUpperCase();
-        
-        // Remove comments and normalize whitespace
-        String normalizedSql = removeComments(cleanSql).replaceAll("\\s+", " ").toUpperCase();
-        
-        // 1. Must start with SELECT
-        if (!normalizedSql.startsWith("SELECT ")) {
-            return "Only SELECT queries are allowed. Query must start with SELECT.";
-        }
-        
-        // 2. Prohibited keywords that could indicate injection or dangerous operations
-        String[] prohibitedKeywords = {
-            ";", // Statement terminator - no chaining allowed
-            "INSERT", "UPDATE", "DELETE", "DROP", "CREATE", "ALTER", "TRUNCATE",
-            "EXEC", "EXECUTE", "CALL", "MERGE", "GRANT", "REVOKE",
-            "COMMIT", "ROLLBACK", "SAVEPOINT",
-            "DBMS_", "UTL_", "SYS.", "SYSTEM.", 
-            "DUAL;", // Prevent ; after DUAL
-            "/*", "*/", // Block multi-line comments
-            "UNION ALL SELECT", "UNION SELECT", // Prevent UNION-based injection
-            "WAITFOR", "SLEEP", "BENCHMARK", "PG_SLEEP", // Time-based attacks
-            "XP_", "SP_", // SQL Server extended/system procedures
-        };
-        
-        for (String keyword : prohibitedKeywords) {
-            if (normalizedSql.contains(keyword)) {
-                return "Security violation: Prohibited keyword '" + keyword + "' found in query";
-            }
-        }
-        
-        // 3. Check for multiple statements (semicolon not at very end)
-        int semicolonIndex = cleanSql.indexOf(';');
-        if (semicolonIndex != -1 && semicolonIndex < cleanSql.length() - 1) {
-            return "Security violation: Multiple statements not allowed";
-        }
-        
-        // 4. Validate parentheses are balanced (prevent injection through unmatched parens)
-        if (!areParenthesesBalanced(cleanSql)) {
-            return "Security violation: Unbalanced parentheses in query";
-        }
-        
-        // 5. Check for suspicious patterns
-        if (normalizedSql.contains("1=1") || normalizedSql.contains("1 = 1")) {
-            return "Security violation: Suspicious pattern '1=1' detected";
-        }
-        
-        if (normalizedSql.contains("OR '1'='1'") || normalizedSql.contains("OR 1=1")) {
-            return "Security violation: SQL injection pattern detected";
-        }
-        
-        // 6. Limit query complexity (max 10 UNION, no excessive nesting)
-        long unionCount = normalizedSql.chars().filter(ch -> ch == 'U').count();
-        if (unionCount > 10) {
-            return "Security violation: Too many UNION operations (max 10 allowed)";
-        }
-        
-        return null; // Query is valid
-    }
-    
-    /**
-     * Remove SQL comments from query
-     */
-    private static String removeComments(String sql) {
-        // DISABLED: Comment removal was causing SQL corruption (ORA-00911 errors)
-        // The regex "--.*$" was incorrectly matching and corrupting SQL strings
-        // Since AI assistants shouldn't generate SQL with comments anyway, we disable this
-        return sql;
-    }
-    
-    /**
-     * Check if parentheses are balanced in SQL query
-     */
-    private static boolean areParenthesesBalanced(String sql) {
-        int count = 0;
-        for (char c : sql.toCharArray()) {
-            if (c == '(') count++;
-            else if (c == ')') count--;
-            if (count < 0) return false; // More closing than opening
-        }
-        return count == 0; // All parentheses matched
-    }
+
 }
