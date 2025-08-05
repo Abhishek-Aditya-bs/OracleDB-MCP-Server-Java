@@ -113,7 +113,7 @@ public class OracleDbMcpServer {
             
         McpSchema.Tool executeQueryTool = new McpSchema.Tool(
             "execute_query",
-            "Execute optimized SQL SELECT queries against Oracle database. IMPORTANT: Before building queries, Copilot should: 1) Use search_tables to find relevant tables, 2) Use get_table_details to understand table structure, 3) Build efficient queries with proper WHERE clauses, indexes, and LIMIT when appropriate, 4) Avoid SELECT * for large tables - specify needed columns only.",
+            "Execute optimized SQL SELECT queries against Oracle database. IMPORTANT: Before building queries, you should: 1) Use search_tables to find relevant tables, 2) Use get_table_details to understand table structure, 3) Build efficient queries with proper WHERE clauses, indexes, and LIMIT when appropriate, 4) Avoid SELECT * for large tables - specify needed columns only.",
             schema
         );
         

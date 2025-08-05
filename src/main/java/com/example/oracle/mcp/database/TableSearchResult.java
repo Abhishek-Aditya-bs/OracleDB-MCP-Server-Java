@@ -6,7 +6,7 @@ import java.util.HashMap;
 
 /**
  * Represents a table found during search with relevance scoring.
- * Used by Copilot to discover appropriate tables for queries.
+ * Used by AI assistants to discover appropriate tables for queries.
  */
 public class TableSearchResult {
     
@@ -79,7 +79,7 @@ public class TableSearchResult {
     }
     
     /**
-     * Get a summary description for Copilot
+     * Get a summary description for AI assistants
      */
     public String getSummaryDescription() {
         StringBuilder desc = new StringBuilder();

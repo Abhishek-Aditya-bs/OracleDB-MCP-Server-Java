@@ -19,8 +19,8 @@ This file contains all database connection configurations for different environm
    - `jdbc.trace.logfile`: JDBC trace log file location
 
 3. **Schema Configuration**
-   - `schema.default`: Default schema (AFX)
-   - `schema.secondary`: Secondary schema (AFX_WF)
+   - `schema.default`: Default schema
+   - `schema.secondary`: Secondary schema
 
 4. **Environment-specific URLs**
    - `dev.url`: Development environment connection string

@@ -1,19 +1,19 @@
 # Oracle DB MCP Server
 
-A Model Context Protocol (MCP) server implementation for Oracle Database integration. This server enables AI assistants like GitHub Copilot to interact with Oracle databases by providing the tools needed for intelligent query discovery and execution.
+A Model Context Protocol (MCP) server implementation for Oracle Database integration. This server enables AI assistants (GitHub Copilot, Claude Desktop, ChatGPT, etc.) to interact with Oracle databases by providing the tools needed for intelligent query discovery and execution.
 
 ## 🧠 **Perfect Architecture for AI Assistants**
 
 This server follows the **correct MCP architecture** where:
 
-- **🤖 Copilot provides the intelligence**: Natural language understanding, query building, and decision making
+- **🤖 AI Assistant provides the intelligence**: Natural language understanding, query building, and decision making
 - **🔧 Our server provides the tools**: Database discovery, schema exploration, and query execution
-- **⚡ Perfect collaboration**: Copilot discovers tables → builds SQL → executes via our server
+- **⚡ Perfect collaboration**: AI Assistant discovers tables → builds SQL → executes via our server
 
-### **Example Workflow**
+### **Example Workflow with GitHub Copilot**
 1. **User asks Copilot**: *"Can you please get me the status of Trade ID = 'abc123'?"*
 2. **Copilot uses our `search_tables` tool**: Searches for "trade" and discovers `AFX_TRADE` table
-3. **Copilot uses our `get_table_details` tool**: Gets column details like `TRADE_ID`, `TRADE_STATUS`  
+3. **Copilot uses our `get_table_details` tool**: Gets column details like `TRADE_ID`, `TRADE_STATUS`
 4. **Copilot builds SQL**: `SELECT TRADE_ID, TRADE_STATUS FROM AFX.AFX_TRADE WHERE TRADE_ID = 'abc123'`
 5. **Copilot uses our `execute_query` tool**: Executes the SQL and gets results
 
@@ -23,7 +23,7 @@ This server follows the **correct MCP architecture** where:
 - **📋 Detailed Schema Information**: Get complete table and column details for query building
 - **🌍 Multi-Environment Support**: Connect to Development, UAT, and Production environments  
 - **🔗 Dynamic Schema Support**: Configurable schemas (no hardcoded values)
-- **⚡ Simple Query Execution**: Execute SQL built by Copilot
+- **⚡ Simple Query Execution**: Execute SQL built by AI assistants
 - **📊 Query Optimization**: Generate and analyze execution plans (EXPLAIN PLAN) 
 - **🔄 Connection Management**: Intelligent connection pooling and environment switching
 - **📈 Status Monitoring**: Real-time connection status and environment information
@@ -100,7 +100,7 @@ The server will start and listen for MCP requests via STDIO (standard input/outp
 ### 1. 🔍 Search Tables Tool
 - **Name**: `search_tables`
 - **Description**: Search for database tables that match a pattern
-- **Purpose**: **For Copilot to discover relevant tables**
+- **Purpose**: **For AI assistants to discover relevant tables**
 - **Examples**:
   - `search_pattern: "trade"` → Finds `AFX_TRADE`, `TRADE_HISTORY` tables
   - `search_pattern: "user"` → Finds `AFX_USERS`, `USER_PROFILES` tables
@@ -113,7 +113,7 @@ The server will start and listen for MCP requests via STDIO (standard input/outp
 ### 2. 📋 Get Table Details Tool
 - **Name**: `get_table_details`
 - **Description**: Get detailed information about a specific table
-- **Purpose**: **For Copilot to understand table structure before building SQL**
+- **Purpose**: **For AI assistants to understand table structure before building SQL**
 - **Returns**: Complete column information, data types, nullable constraints
 - **Parameters**:
   - `table_name` (string, required): Table name or SCHEMA.TABLE_NAME
@@ -122,8 +122,8 @@ The server will start and listen for MCP requests via STDIO (standard input/outp
 
 ### 3. ⚡ Execute Query Tool
 - **Name**: `execute_query`
-- **Description**: Execute a SQL SELECT query built by Copilot
-- **Purpose**: **Run the SQL that Copilot builds**
+- **Description**: Execute a SQL SELECT query built by AI assistants
+- **Purpose**: **Run the SQL that AI assistants build**
 - **Parameters**:
   - `sql` (string, required): The SELECT statement to execute
   - `environment` (string, optional): Target environment
@@ -193,13 +193,13 @@ The `database.properties` file contains **placeholder values** that must be repl
 
 **⚠️ The server will not work until these placeholder values are replaced with your actual database connection details.**
 
-## 🎯 **How Copilot Uses These Tools**
+## 🎯 **How AI Assistants Use These Tools**
 
 ### **Example: User asks for trade status**
 
 **User**: *"Can you please get me the status of Trade ID = 'abc123'?"*
 
-**Copilot's process**:
+**AI Assistant's process**:
 
 1. **🔍 Discover tables**:
    ```json
@@ -241,7 +241,7 @@ The `database.properties` file contains **placeholder values** that must be repl
 
 **User**: *"Show me active users in development environment"*
 
-**Copilot's process**:
+**AI Assistant's process**:
 
 1. **🔍 Search for user tables**:
    ```json
@@ -278,9 +278,9 @@ The `database.properties` file contains **placeholder values** that must be repl
 
 ## 🎉 **Perfect MCP Architecture Benefits**
 
-- **🧠 Copilot handles complexity**: Natural language understanding, query logic, business rules
+- **🧠 AI Assistant handles complexity**: Natural language understanding, query logic, business rules
 - **🔧 Our server stays focused**: Database operations, connection management, security
-- **🚀 Scalable**: Copilot can handle any query complexity without server changes
+- **🚀 Scalable**: AI Assistant can handle any query complexity without server changes
 - **🔒 Secure**: Server only provides safe database access tools
 - **🔄 Maintainable**: Clear separation of concerns
 
@@ -302,9 +302,9 @@ This project is feature-complete and ready for use with proper database configur
 - ✅ Maven build configuration
 - ✅ Oracle JDBC driver integration  
 - ✅ Multi-environment connection management
-- ✅ **🆕 Smart table discovery for Copilot**
+- ✅ **🆕 Smart table discovery for AI assistants**
 - ✅ **🆕 Detailed table/column information**
-- ✅ **🆕 Clean separation: Copilot = intelligence, Server = tools**
+- ✅ **🆕 Clean separation: AI Assistant = intelligence, Server = tools**
 - ✅ **🆕 Dynamic schema configuration (no hardcoded values)**
 - ✅ Query execution with full result formatting
 - ✅ EXPLAIN PLAN functionality
@@ -313,7 +313,7 @@ This project is feature-complete and ready for use with proper database configur
 - ✅ Kerberos authentication integration
 - ✅ Externalized configuration system
 
-### 🎉 Usage Examples with GitHub Copilot:
+### 🎉 Usage Examples (GitHub Copilot, Claude Desktop, etc.):
 
 **Natural Language Requests** *(Copilot figures out the tables and SQL)*:
 - **"Can you please get me the status of Trade ID = 'abc123'?"**
@@ -322,7 +322,7 @@ This project is feature-complete and ready for use with proper database configur
 - **"Get customer details for customer_id 12345"**
 - **"List all pending trades in production"**
 
-**What Copilot Does Automatically**:
+**What AI Assistants Do Automatically**:
 1. **Discovers relevant tables** using our search tools
 2. **Understands table structure** using our detail tools  
 3. **Builds appropriate SQL** using its AI capabilities
