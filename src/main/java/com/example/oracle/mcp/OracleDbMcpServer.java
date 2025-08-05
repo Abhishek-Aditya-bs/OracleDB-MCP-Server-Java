@@ -122,6 +122,8 @@ public class OracleDbMcpServer {
             (exchange, arguments) -> {
                 try {
                     String sql = (String) arguments.get("sql");
+                    String environmentParam = (String) arguments.get("environment");
+                    String schemaParam = (String) arguments.get("schema");
                     
                     if (sql == null || sql.trim().isEmpty()) {
                         return new McpSchema.CallToolResult(
@@ -130,9 +132,11 @@ public class OracleDbMcpServer {
                         );
                     }
                     
-                    // Use current environment and schema
-                    Environment environment = connectionManager.getCurrentEnvironment();
-                    Schema selectedSchema = connectionManager.getCurrentSchema();
+                    // Determine environment and schema
+                    Environment environment = environmentParam != null ?
+                        Environment.fromString(environmentParam) : connectionManager.getCurrentEnvironment();
+                    Schema selectedSchema = schemaParam != null ?
+                        config.findSchemaByName(schemaParam) : connectionManager.getCurrentSchema();
                     
                     // Comprehensive security validation
                     String validationError = validateSqlSecurity(sql);
