@@ -12,8 +12,7 @@ import com.example.oracle.mcp.config.DatabaseConfig.Environment;
 import com.example.oracle.mcp.config.DatabaseConfig.Schema;
 import com.example.oracle.mcp.database.DatabaseConnectionManager;
 import com.example.oracle.mcp.database.QueryResult;
-import com.example.oracle.mcp.database.SchemaInfo;
-import com.example.oracle.mcp.database.TableSearchResult;
+
 
 import java.sql.*;
 import java.util.Map;
@@ -54,12 +53,8 @@ public class OracleDbMcpServer {
             
             // Register database tools
             server.addTool(createExecuteQueryTool());
-            server.addTool(createExplainPlanTool());
-            server.addTool(createGetSchemaInfoTool());
             server.addTool(createConnectToEnvironmentTool());
             server.addTool(createGetCurrentStatusTool());
-            server.addTool(createSearchTablesTool());
-            server.addTool(createGetTableDetailsTool());
             
             // Keep the server running
             System.err.println("Oracle DB MCP Server started. Waiting for requests...");
@@ -170,143 +165,9 @@ public class OracleDbMcpServer {
         );
     }
     
-    /**
-     * Creates the explain plan tool specification.
-     */
-    private static McpServerFeatures.SyncToolSpecification createExplainPlanTool() {
-        String schema = """
-            {
-              "type": "object",
-              "properties": {
-                "sql": {
-                  "type": "string",
-                  "description": "SQL query to analyze. Include schema prefixes as needed. Example: SELECT * FROM SCHEMA.TABLE_NAME WHERE ID = 'value'"
-                }
-              },
-              "required": ["sql"]
-            }
-            """;
-            
-        McpSchema.Tool explainPlanTool = new McpSchema.Tool(
-            "explain_plan",
-            "Generate execution plan for a SQL query to analyze performance.",
-            schema
-        );
-        
-        return new McpServerFeatures.SyncToolSpecification(
-            explainPlanTool,
-            (exchange, arguments) -> {
-                try {
-                    String sql = (String) arguments.get("sql");
-                    
-                    if (sql == null || sql.trim().isEmpty()) {
-                        return new McpSchema.CallToolResult(
-                            "sql parameter is required",
-                            true
-                        );
-                    }
-                    
-                    // Use current environment and schema
-                    Environment environment = connectionManager.getCurrentEnvironment();
-                    Schema selectedSchema = connectionManager.getCurrentSchema();
-                    
-                    // Use the SQL query directly
-                    String cleanQuery = sql;
-                    
-                    // Generate execution plan using current environment/schema
-                    String explainPlan = connectionManager.getExecutionPlan(cleanQuery);
-                    
-                    Map<String, Object> response = new HashMap<>();
-                    response.put("operation", "explain_plan");
-                    response.put("environment", environment.getKey());
-                    response.put("schema", selectedSchema.getName());
-                    response.put("sql", cleanQuery);
-                    response.put("execution_plan", explainPlan);
-                    
-                    ObjectMapper mapper = new ObjectMapper();
-                    String jsonResponse = mapper.writeValueAsString(response);
-                    
-                    return new McpSchema.CallToolResult(
-                        List.of(new McpSchema.TextContent(jsonResponse)),
-                        false
-                    );
-                    
-                } catch (SQLException e) {
-                    return new McpSchema.CallToolResult(
-                        "Database error: " + e.getMessage(),
-                        true
-                    );
-                } catch (Exception e) {
-                    return new McpSchema.CallToolResult(
-                        "Error generating explain plan: " + e.getMessage(),
-                        true
-                    );
-                }
-            }
-        );
-    }
+
     
-    /**
-     * Creates the get schema info tool specification.
-     */
-    private static McpServerFeatures.SyncToolSpecification createGetSchemaInfoTool() {
-        String schema = """
-            {
-              "type": "object",
-              "properties": {}
-            }
-            """;
-            
-        McpSchema.Tool getSchemaInfoTool = new McpSchema.Tool(
-            "get_schema_info",
-            "Get complete information about the current database schema including all tables and views.",
-            schema
-        );
-        
-        return new McpServerFeatures.SyncToolSpecification(
-            getSchemaInfoTool,
-            (exchange, arguments) -> {
-                try {
-                    // No arguments needed - use current environment and schema
-                    Environment environment = connectionManager.getCurrentEnvironment();
-                    Schema selectedSchema = connectionManager.getCurrentSchema();
-                    
-                    // Get schema information
-                    SchemaInfo schemaInfo = connectionManager.getSchemaInfo(selectedSchema);
-                    
-                    Map<String, Object> response = new HashMap<>();
-                    response.put("operation", "get_schema_info");
-                    response.put("environment", environment.getKey());
-                    response.put("schema", selectedSchema.getName());
-                    response.put("current_schema", selectedSchema.getName());
-                    response.put("schema_info", schemaInfo.toMap());
-                    
-                    // Add table count for quick reference
-                    response.put("table_count", schemaInfo.getTables().size());
-                    response.put("view_count", schemaInfo.getViews().size());
-                    
-                    ObjectMapper mapper = new ObjectMapper();
-                    String jsonResponse = mapper.writeValueAsString(response);
-                    
-                    return new McpSchema.CallToolResult(
-                        List.of(new McpSchema.TextContent(jsonResponse)),
-                        false
-                    );
-                    
-                } catch (SQLException e) {
-                    return new McpSchema.CallToolResult(
-                        "Database error: " + e.getMessage(),
-                        true
-                    );
-                } catch (Exception e) {
-                    return new McpSchema.CallToolResult(
-                        "Error retrieving schema information: " + e.getMessage(),
-                        true
-                    );
-                }
-            }
-        );
-    }
+
     
     /**
      * Creates the connect to environment tool specification.
@@ -429,10 +290,30 @@ public class OracleDbMcpServer {
                     
                     if (isConnected) {
                         try {
-                            SchemaInfo schemaInfo = connectionManager.getSchemaInfo(currentSchema);
+                            // Get simple table and view counts using direct SQL
+                            QueryResult tableCountResult = connectionManager.executeQuery(
+                                "SELECT COUNT(*) as table_count FROM all_tables WHERE owner = '" + currentSchema.getName() + "'", 
+                                currentEnv, currentSchema);
+                            QueryResult viewCountResult = connectionManager.executeQuery(
+                                "SELECT COUNT(*) as view_count FROM all_views WHERE owner = '" + currentSchema.getName() + "'", 
+                                currentEnv, currentSchema);
+                            
+                            int tableCount = 0;
+                            int viewCount = 0;
+                            
+                            if (!tableCountResult.getRows().isEmpty()) {
+                                Object countObj = tableCountResult.getRows().get(0).get("TABLE_COUNT");
+                                tableCount = countObj instanceof Number ? ((Number) countObj).intValue() : 0;
+                            }
+                            
+                            if (!viewCountResult.getRows().isEmpty()) {
+                                Object countObj = viewCountResult.getRows().get(0).get("VIEW_COUNT");
+                                viewCount = countObj instanceof Number ? ((Number) countObj).intValue() : 0;
+                            }
+                            
                             response.put("schema_summary", Map.of(
-                                "table_count", schemaInfo.getTables().size(),
-                                "view_count", schemaInfo.getViews().size()
+                                "table_count", tableCount,
+                                "view_count", viewCount
                             ));
                         } catch (SQLException e) {
                             response.put("schema_summary", "Error retrieving schema info: " + e.getMessage());
@@ -457,221 +338,5 @@ public class OracleDbMcpServer {
         );
     }
     
-    /**
-     * Creates the search tables tool specification.
-     */
-    private static McpServerFeatures.SyncToolSpecification createSearchTablesTool() {
-        String schema = """
-            {
-              "type": "object",
-              "properties": {
-                "keyword": {
-                  "type": "string",
-                  "description": "Search keyword. Examples: trade, user, order, customer"
-                },
-                "environment": {
-                  "type": "string",
-                  "description": "Database environment: dev, uat, prod (optional, defaults to current environment)",
-                  "enum": ["dev", "uat", "prod"]
-                },
-                "schema": {
-                  "type": "string",
-                  "description": "Database schema name (optional, searches all schemas if not specified)"
-                }
-              },
-              "required": ["keyword"]
-            }
-            """;
-            
-        McpSchema.Tool searchTablesTool = new McpSchema.Tool(
-            "search_tables",
-            "Search for database tables by keyword to find relevant tables. Use this FIRST before building queries. Search for business concepts (e.g., 'trade', 'user', 'order') rather than exact table names. Returns table names with columns and relevance scores.",
-            schema
-        );
-        
-        return new McpServerFeatures.SyncToolSpecification(
-            searchTablesTool,
-            (exchange, arguments) -> {
-                try {
-                    String keyword = (String) arguments.get("keyword");
-                    String environmentParam = (String) arguments.get("environment");
-                    String schemaParam = (String) arguments.get("schema");
-                    
-                    if (keyword == null || keyword.trim().isEmpty()) {
-                        return new McpSchema.CallToolResult(
-                            "keyword parameter is required",
-                            true
-                        );
-                    }
-                    
-                    // Use specified environment or default
-                    Environment environment = environmentParam != null ? 
-                        Environment.fromString(environmentParam) : connectionManager.getCurrentEnvironment();
-                    Schema targetSchema = schemaParam != null ? 
-                        config.findSchemaByName(schemaParam) : null;
-                    
-                    // Switch to specified environment
-                    connectionManager.switchEnvironment(environment);
-                    
-                    // Search for tables
-                    List<TableSearchResult> results = connectionManager.searchTables(keyword, targetSchema);
-                    
-                    Map<String, Object> response = new HashMap<>();
-                    response.put("operation", "search_tables");
-                    response.put("search_keyword", keyword);
-                    response.put("environment", environment.getKey());
-                    response.put("target_schema", targetSchema != null ? targetSchema.getName() : "all_schemas");
-                    response.put("found_tables", results.stream().map(TableSearchResult::toMap).toList());
-                    response.put("table_count", results.size());
-                    
-                    // Add summary for easy reading
-                    List<String> tableSummaries = results.stream()
-                            .limit(10) // Top 10 results
-                            .map(TableSearchResult::getSummaryDescription)
-                            .toList();
-                    response.put("table_summaries", tableSummaries);
-                    
-                    ObjectMapper mapper = new ObjectMapper();
-                    String jsonResponse = mapper.writeValueAsString(response);
-                    
-                    return new McpSchema.CallToolResult(
-                        List.of(new McpSchema.TextContent(jsonResponse)),
-                        false
-                    );
-                    
-                } catch (SQLException e) {
-                    return new McpSchema.CallToolResult(
-                        "Database error during table search: " + e.getMessage(),
-                        true
-                    );
-                } catch (Exception e) {
-                    return new McpSchema.CallToolResult(
-                        "Error searching tables: " + e.getMessage(),
-                        true
-                    );
-                }
-            }
-        );
-    }
-    
-    /**
-     * Creates the get table details tool specification.
-     */
-    private static McpServerFeatures.SyncToolSpecification createGetTableDetailsTool() {
-        String schema = """
-            {
-              "type": "object",
-              "properties": {
-                "table": {
-                  "type": "string",
-                  "description": "Table name like TABLE_NAME or SCHEMA.TABLE_NAME"
-                },
-                "environment": {
-                  "type": "string",
-                  "description": "Database environment: dev, uat, prod (optional, defaults to current environment)",
-                  "enum": ["dev", "uat", "prod"]
-                },
-                "schema": {
-                  "type": "string",
-                  "description": "Database schema name (optional, uses schema from table name or current schema)"
-                }
-              },
-              "required": ["table"]
-            }
-            """;
-            
-        McpSchema.Tool getTableDetailsTool = new McpSchema.Tool(
-            "get_table_details",
-            "Get detailed information about a table including all columns and data types.",
-            schema
-        );
-        
-        return new McpServerFeatures.SyncToolSpecification(
-            getTableDetailsTool,
-            (exchange, arguments) -> {
-                try {
-                    String table = (String) arguments.get("table");
-                    String environmentParam = (String) arguments.get("environment");
-                    String schemaParam = (String) arguments.get("schema");
-                    
-                    if (table == null || table.trim().isEmpty()) {
-                        return new McpSchema.CallToolResult(
-                            "table parameter is required",
-                            true
-                        );
-                    }
-                    
-                    // Use specified environment or default
-                    Environment environment = environmentParam != null ? 
-                        Environment.fromString(environmentParam) : connectionManager.getCurrentEnvironment();
-                    
-                    // Parse schema and table name
-                    String actualSchemaName;
-                    String actualTableName;
-                    
-                    if (table.contains(".")) {
-                        String[] parts = table.split("\\.", 2);
-                        actualSchemaName = parts[0];
-                        actualTableName = parts[1];
-                    } else {
-                        actualSchemaName = schemaParam != null ? schemaParam : connectionManager.getCurrentSchema().getName();
-                        actualTableName = table;
-                    }
-                    
-                    // Switch to specified environment
-                    connectionManager.switchEnvironment(environment);
-                    
-                    Schema targetSchema = config.findSchemaByName(actualSchemaName);
-                    
-                    // Get schema info and find the specific table
-                    SchemaInfo schemaInfo = connectionManager.getSchemaInfo(targetSchema);
-                    SchemaInfo.TableInfo tableInfo = schemaInfo.getTables().stream()
-                            .filter(tbl -> tbl.getName().equalsIgnoreCase(actualTableName))
-                            .findFirst()
-                            .orElse(null);
-                    
-                    if (tableInfo == null) {
-                        return new McpSchema.CallToolResult(
-                            "Table " + actualTableName + " not found in schema " + actualSchemaName,
-                            true
-                        );
-                    }
-                    
-                    Map<String, Object> response = new HashMap<>();
-                    response.put("operation", "get_table_details");
-                    response.put("environment", environment.getKey());
-                    response.put("schema", actualSchemaName);
-                    response.put("table", actualTableName);
-                    response.put("full_table_name", actualSchemaName + "." + actualTableName);
-                    response.put("table_details", tableInfo.toMap());
-                    
-                    // Add convenient column summaries
-                    List<String> columnSummaries = tableInfo.getColumns().stream()
-                            .map(col -> col.getName() + " (" + col.getDataType() + 
-                                       (col.isNullable() ? ", nullable" : ", not null") + ")")
-                            .toList();
-                    response.put("column_summaries", columnSummaries);
-                    
-                    ObjectMapper mapper = new ObjectMapper();
-                    String jsonResponse = mapper.writeValueAsString(response);
-                    
-                    return new McpSchema.CallToolResult(
-                        List.of(new McpSchema.TextContent(jsonResponse)),
-                        false
-                    );
-                    
-                } catch (SQLException e) {
-                    return new McpSchema.CallToolResult(
-                        "Database error getting table details: " + e.getMessage(),
-                        true
-                    );
-                } catch (Exception e) {
-                    return new McpSchema.CallToolResult(
-                        "Error getting table details: " + e.getMessage(),
-                        true
-                    );
-                }
-            }
-        );
-    }
+
 }
