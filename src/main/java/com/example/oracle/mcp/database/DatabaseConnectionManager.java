@@ -126,10 +126,13 @@ public class DatabaseConnectionManager {
         // Modify query to include schema if not explicitly specified
         String finalSql = addSchemaToQuery(sql, currentSchema);
         
-        try (Statement statement = connection.createStatement();
-             ResultSet resultSet = statement.executeQuery(finalSql)) {
+        try (Statement statement = connection.createStatement()) {
+            // Set query timeout to prevent long-running queries (60 seconds)
+            statement.setQueryTimeout(60);
             
-            return QueryResult.fromResultSet(resultSet, currentEnvironment, currentSchema);
+            try (ResultSet resultSet = statement.executeQuery(finalSql)) {
+                return QueryResult.fromResultSet(resultSet, currentEnvironment, currentSchema);
+            }
         }
     }
     
@@ -164,12 +167,14 @@ public class DatabaseConnectionManager {
         try {
             // Create plan table if it doesn't exist
             try (Statement stmt = connection.createStatement()) {
+                stmt.setQueryTimeout(30); // 30 seconds timeout for plan table creation
                 stmt.execute("CREATE GLOBAL TEMPORARY TABLE " + planTable + " AS SELECT * FROM PLAN_TABLE WHERE 1=0");
             }
             
             // Generate execution plan
             String explainSql = "EXPLAIN PLAN SET STATEMENT_ID = 'MCP_PLAN' INTO " + planTable + " FOR " + finalSql;
             try (Statement stmt = connection.createStatement()) {
+                stmt.setQueryTimeout(30); // 30 seconds timeout for explain plan
                 stmt.execute(explainSql);
             }
             
@@ -182,11 +187,12 @@ public class DatabaseConnectionManager {
                                "START WITH ID = 0 " +
                                "ORDER BY ID";
             
-            try (Statement stmt = connection.createStatement();
-                 ResultSet rs = stmt.executeQuery(selectPlan)) {
-                
-                while (rs.next()) {
-                    planOutput.append(rs.getString("PLAN_LINE")).append("\n");
+            try (Statement stmt = connection.createStatement()) {
+                stmt.setQueryTimeout(30); // 30 seconds timeout for plan retrieval
+                try (ResultSet rs = stmt.executeQuery(selectPlan)) {
+                    while (rs.next()) {
+                        planOutput.append(rs.getString("PLAN_LINE")).append("\n");
+                    }
                 }
             }
             

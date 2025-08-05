@@ -95,7 +95,7 @@ public class OracleDbMcpServer {
               "properties": {
                 "sql": {
                   "type": "string",
-                  "description": "SQL query to execute. Example: SELECT * FROM AFX_TRADE WHERE TRADE_ID = 'abc'"
+                  "description": "SQL query to execute. Example: SELECT * FROM SCHEMA.TABLE_NAME WHERE ID = 'value'"
                 },
                 "environment": {
                   "type": "string",
@@ -113,7 +113,7 @@ public class OracleDbMcpServer {
             
         McpSchema.Tool executeQueryTool = new McpSchema.Tool(
             "execute_query",
-            "Execute SQL SELECT queries against Oracle database. Copilot should build the SQL query and pass it to this tool.",
+            "Execute optimized SQL SELECT queries against Oracle database. IMPORTANT: Before building queries, Copilot should: 1) Use search_tables to find relevant tables, 2) Use get_table_details to understand table structure, 3) Build efficient queries with proper WHERE clauses, indexes, and LIMIT when appropriate, 4) Avoid SELECT * for large tables - specify needed columns only.",
             schema
         );
         
@@ -134,23 +134,24 @@ public class OracleDbMcpServer {
                     Environment environment = connectionManager.getCurrentEnvironment();
                     Schema selectedSchema = connectionManager.getCurrentSchema();
                     
-                    // Security check: only allow SELECT statements
-                    String upperSql = sql.trim().toUpperCase();
-                    if (!upperSql.startsWith("SELECT")) {
-                        return new McpSchema.CallToolResult(
-                            "Only SELECT queries are allowed for security reasons. Query must start with SELECT.",
-                            true
-                        );
+                    // Comprehensive security validation
+                    String validationError = validateSqlSecurity(sql);
+                    if (validationError != null) {
+                        return new McpSchema.CallToolResult(validationError, true);
                     }
                     
+                    // Auto-prefix table names with schema if missing
+                    String prefixedSql = addSchemaPrefix(sql, selectedSchema);
+                    
                     // Execute the query
-                    QueryResult result = connectionManager.executeQuery(sql, environment, selectedSchema);
+                    QueryResult result = connectionManager.executeQuery(prefixedSql, environment, selectedSchema);
                     
                     Map<String, Object> response = new HashMap<>();
                     response.put("operation", "execute_query");
                     response.put("environment", environment.getKey());
                     response.put("schema", selectedSchema.getName());
-                    response.put("executed_sql", sql);
+                    response.put("original_sql", sql);
+                    response.put("executed_sql", prefixedSql);
                     response.put("result", result.toMap());
                     response.put("formatted_result", result.toFormattedString());
                     
@@ -187,7 +188,7 @@ public class OracleDbMcpServer {
               "properties": {
                 "sql": {
                   "type": "string",
-                  "description": "SQL query to analyze. Example: SELECT * FROM AFX_TRADE WHERE TRADE_ID = 'abc'"
+                  "description": "SQL query to analyze. Example: SELECT * FROM SCHEMA.TABLE_NAME WHERE ID = 'value'"
                 }
               },
               "required": ["sql"]
@@ -213,12 +214,18 @@ public class OracleDbMcpServer {
                         );
                     }
                     
+                    // Comprehensive security validation
+                    String validationError = validateSqlSecurity(sql);
+                    if (validationError != null) {
+                        return new McpSchema.CallToolResult(validationError, true);
+                    }
+                    
                     // Use current environment and schema
                     Environment environment = connectionManager.getCurrentEnvironment();
                     Schema selectedSchema = connectionManager.getCurrentSchema();
                     
-                    // Use the SQL query directly
-                    String cleanQuery = sql;
+                    // Auto-prefix table names with schema if missing
+                    String cleanQuery = addSchemaPrefix(sql, selectedSchema);
                     
                     // Generate execution plan using current environment/schema
                     String explainPlan = connectionManager.getExecutionPlan(cleanQuery);
@@ -492,7 +499,7 @@ public class OracleDbMcpServer {
             
         McpSchema.Tool searchTablesTool = new McpSchema.Tool(
             "search_tables",
-            "Search for database tables by keyword to find relevant tables.",
+            "Search for database tables by keyword to find relevant tables. Use this FIRST before building queries. Search for business concepts (e.g., 'trade', 'user', 'order') rather than exact table names. Returns table names with columns and relevance scores.",
             schema
         );
         
@@ -571,7 +578,7 @@ public class OracleDbMcpServer {
               "properties": {
                 "table": {
                   "type": "string",
-                  "description": "Table name like AFX_TRADE or SCHEMA.TABLE_NAME"
+                  "description": "Table name like TABLE_NAME or SCHEMA.TABLE_NAME"
                 },
                 "environment": {
                   "type": "string",
@@ -739,5 +746,124 @@ public class OracleDbMcpServer {
         
         // If no clear SQL found, return the original text and let the user fix it
         return trimmed;
+    }
+    
+    /**
+     * Automatically add schema prefix to table names that don't already have one.
+     * Converts: SELECT * FROM TABLE_NAME to SELECT * FROM SCHEMA.TABLE_NAME
+     */
+    private static String addSchemaPrefix(String sql, Schema schema) {
+        if (sql == null || schema == null) {
+            return sql;
+        }
+        
+        String schemaName = schema.getName();
+        if (schemaName == null || schemaName.trim().isEmpty()) {
+            return sql;
+        }
+        
+        // Simple regex-based approach to add schema prefix
+        // This handles common cases: FROM table_name, JOIN table_name, UPDATE table_name, etc.
+        // Note: This is a basic implementation. For production, consider using a SQL parser.
+        
+        String result = sql;
+        
+        // Pattern to match table references after FROM, JOIN, UPDATE, INSERT INTO, etc.
+        // Matches: FROM table_name, JOIN table_name, etc. but not FROM schema.table_name
+        String pattern = "(?i)\\b(FROM|JOIN|UPDATE|INSERT\\s+INTO)\\s+([A-Za-z_][A-Za-z0-9_]*)(?!\\.)";
+        
+        result = result.replaceAll(pattern, "$1 " + schemaName + ".$2");
+        
+        return result;
+    }
+    
+    /**
+     * Comprehensive SQL security validation to prevent injection attacks
+     * and ensure only safe SELECT queries are executed.
+     */
+    private static String validateSqlSecurity(String sql) {
+        if (sql == null || sql.trim().isEmpty()) {
+            return "SQL query cannot be empty";
+        }
+        
+        String cleanSql = sql.trim();
+        String upperSql = cleanSql.toUpperCase();
+        
+        // Remove comments and normalize whitespace
+        String normalizedSql = removeComments(cleanSql).replaceAll("\\s+", " ").toUpperCase();
+        
+        // 1. Must start with SELECT
+        if (!normalizedSql.startsWith("SELECT ")) {
+            return "Only SELECT queries are allowed. Query must start with SELECT.";
+        }
+        
+        // 2. Prohibited keywords that could indicate injection or dangerous operations
+        String[] prohibitedKeywords = {
+            ";", // Statement terminator - no chaining allowed
+            "INSERT", "UPDATE", "DELETE", "DROP", "CREATE", "ALTER", "TRUNCATE",
+            "EXEC", "EXECUTE", "CALL", "MERGE", "GRANT", "REVOKE",
+            "COMMIT", "ROLLBACK", "SAVEPOINT",
+            "DBMS_", "UTL_", "SYS.", "SYSTEM.", 
+            "DUAL;", // Prevent ; after DUAL
+            "--", "/*", "*/", // Block comments (single line comments removed above)
+            "UNION ALL SELECT", "UNION SELECT", // Prevent UNION-based injection
+            "WAITFOR", "SLEEP", "BENCHMARK", "PG_SLEEP", // Time-based attacks
+            "XP_", "SP_", // SQL Server extended/system procedures
+        };
+        
+        for (String keyword : prohibitedKeywords) {
+            if (normalizedSql.contains(keyword)) {
+                return "Security violation: Prohibited keyword '" + keyword + "' found in query";
+            }
+        }
+        
+        // 3. Check for multiple statements (semicolon not at very end)
+        int semicolonIndex = cleanSql.indexOf(';');
+        if (semicolonIndex != -1 && semicolonIndex < cleanSql.length() - 1) {
+            return "Security violation: Multiple statements not allowed";
+        }
+        
+        // 4. Validate parentheses are balanced (prevent injection through unmatched parens)
+        if (!areParenthesesBalanced(cleanSql)) {
+            return "Security violation: Unbalanced parentheses in query";
+        }
+        
+        // 5. Check for suspicious patterns
+        if (normalizedSql.contains("1=1") || normalizedSql.contains("1 = 1")) {
+            return "Security violation: Suspicious pattern '1=1' detected";
+        }
+        
+        if (normalizedSql.contains("OR '1'='1'") || normalizedSql.contains("OR 1=1")) {
+            return "Security violation: SQL injection pattern detected";
+        }
+        
+        // 6. Limit query complexity (max 10 UNION, no excessive nesting)
+        long unionCount = normalizedSql.chars().filter(ch -> ch == 'U').count();
+        if (unionCount > 10) {
+            return "Security violation: Too many UNION operations (max 10 allowed)";
+        }
+        
+        return null; // Query is valid
+    }
+    
+    /**
+     * Remove SQL comments from query
+     */
+    private static String removeComments(String sql) {
+        // Remove single-line comments (-- comment)
+        return sql.replaceAll("--.*$", "").replaceAll("/\\*.*?\\*/", "");
+    }
+    
+    /**
+     * Check if parentheses are balanced in SQL query
+     */
+    private static boolean areParenthesesBalanced(String sql) {
+        int count = 0;
+        for (char c : sql.toCharArray()) {
+            if (c == '(') count++;
+            else if (c == ')') count--;
+            if (count < 0) return false; // More closing than opening
+        }
+        return count == 0; // All parentheses matched
     }
 }
