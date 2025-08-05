@@ -46,10 +46,15 @@ public class SchemaInfo {
                     "WHERE owner = ? " +
                     "ORDER BY table_name";
         
+        // Debug logging
+        System.err.println("DEBUG: Loading tables for schema: '" + schema.getName() + "'");
+        System.err.println("DEBUG: SQL query: " + sql);
+        
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setString(1, schema.getName());
+            stmt.setString(1, schema.getName().toUpperCase()); // Force uppercase for Oracle
             
             try (ResultSet rs = stmt.executeQuery()) {
+                int count = 0;
                 while (rs.next()) {
                     String tableName = rs.getString("table_name");
                     Long numRows = rs.getLong("num_rows");
@@ -58,8 +63,13 @@ public class SchemaInfo {
                     
                     List<ColumnInfo> columns = loadTableColumns(connection, schema, tableName);
                     tables.add(new TableInfo(tableName, numRows, lastAnalyzed, columns));
+                    count++;
                 }
+                System.err.println("DEBUG: Found " + count + " tables for schema '" + schema.getName() + "'");
             }
+        } catch (SQLException e) {
+            System.err.println("ERROR: Failed to load tables for schema '" + schema.getName() + "': " + e.getMessage());
+            throw e;
         }
         
         return tables;
@@ -76,7 +86,7 @@ public class SchemaInfo {
                     "ORDER BY column_id";
         
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setString(1, schema.getName());
+            stmt.setString(1, schema.getName().toUpperCase()); // Force uppercase for Oracle
             stmt.setString(2, tableName);
             
             try (ResultSet rs = stmt.executeQuery()) {

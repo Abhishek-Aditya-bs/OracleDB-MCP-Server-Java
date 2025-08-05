@@ -249,7 +249,8 @@ public class DatabaseConnectionManager {
                 }
             } catch (SQLException e) {
                 // Continue with other schemas if one fails
-                System.err.println("Warning: Could not search schema " + schema.getName() + ": " + e.getMessage());
+                System.err.println("ERROR: Could not search schema '" + schema.getName() + "': " + e.getMessage());
+                e.printStackTrace(); // Print full stack trace for debugging
             }
         }
         
