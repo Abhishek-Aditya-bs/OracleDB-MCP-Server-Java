@@ -306,11 +306,23 @@ The `database.properties` file contains **placeholder values** that must be repl
 
 ## Security Considerations
 
-- Only SELECT statements are allowed to prevent accidental data modification
+### 🛡️ **Query Restrictions**
+- **SELECT-only limitation**: This server only allows SELECT statements to prevent accidental data modification
+- All queries are validated and non-SELECT statements (INSERT, UPDATE, DELETE, etc.) are rejected
+- This is implemented in the `validateSqlSecurity()` method for maximum safety
+
+### 🔧 **Extending Functionality**
+- **Want to allow other query types?** You can fork this repository and modify the SQL validation logic
+- **Location to modify**: `src/main/java/com/example/oracle/mcp/OracleDbMcpServer.java` - look for `validateSqlSecurity()` method
+- **Use case**: Some organizations may need INSERT/UPDATE capabilities for data management workflows
+- **Responsibility**: If you extend beyond SELECT, ensure proper access controls and testing
+
+### 🔒 **Additional Security Features**
 - Supports read-only database connections
-- Implements proper SQL injection prevention
+- Implements comprehensive SQL injection prevention
 - Uses parameterized queries where applicable
-- Supports enterprise authentication mechanisms
+- Supports enterprise authentication mechanisms (Kerberos)
+- Connection timeouts prevent hanging connections
 
 ## Development Status
 
