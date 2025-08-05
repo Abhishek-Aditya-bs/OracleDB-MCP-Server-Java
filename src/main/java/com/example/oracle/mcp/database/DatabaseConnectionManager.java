@@ -159,6 +159,14 @@ public class DatabaseConnectionManager {
      */
     public String getExecutionPlan(String sql) throws SQLException {
         Connection connection = getCurrentConnection();
+        
+        // Check if database is read-only (Active Data Guard standby)
+        if (isReadOnlyDatabase(connection)) {
+            return "EXPLAIN PLAN not available on read-only database (Active Data Guard standby).\n" +
+                   "This is a read-only environment where plan table operations are not permitted.\n" +
+                   "Query: " + sql;
+        }
+        
         String finalSql = addSchemaToQuery(sql, currentSchema);
         
         // Create a unique plan table name
@@ -206,6 +214,23 @@ public class DatabaseConnectionManager {
                 // Ignore cleanup errors
             }
         }
+    }
+    
+    /**
+     * Check if the database is read-only (Active Data Guard standby)
+     */
+    private boolean isReadOnlyDatabase(Connection connection) {
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT DATABASE_ROLE FROM V$DATABASE")) {
+            if (rs.next()) {
+                String role = rs.getString("DATABASE_ROLE");
+                return "PHYSICAL STANDBY".equals(role) || "LOGICAL STANDBY".equals(role);
+            }
+        } catch (SQLException e) {
+            // If we can't determine, assume it might be read-only if we get ORA-16397
+            return e.getMessage() != null && e.getMessage().contains("ORA-16397");
+        }
+        return false;
     }
     
     /**
