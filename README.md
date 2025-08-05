@@ -12,10 +12,28 @@ This server follows the **correct MCP architecture** where:
 
 ### **Example Workflow with GitHub Copilot**
 1. **User asks Copilot**: *"Can you please get me the status of Trade ID = 'abc123'?"*
-2. **Copilot uses our `search_tables` tool**: Searches for "trade" and discovers `AFX_TRADE` table
+2. **Copilot uses our `search_tables` tool**: Searches for "trade" and discovers `TRADE_TABLE` table
 3. **Copilot uses our `get_table_details` tool**: Gets column details like `TRADE_ID`, `TRADE_STATUS`
-4. **Copilot builds SQL**: `SELECT TRADE_ID, TRADE_STATUS FROM AFX.AFX_TRADE WHERE TRADE_ID = 'abc123'`
+4. **Copilot builds SQL**: `SELECT TRADE_ID, TRADE_STATUS FROM SCHEMA.TRADE_TABLE WHERE TRADE_ID = 'abc123'`
 5. **Copilot uses our `execute_query` tool**: Executes the SQL and gets results
+
+## ⚠️ **IMPORTANT: Kerberos Authentication Only**
+
+**This server ONLY supports Kerberos authentication and does NOT work with username/password authentication.**
+
+### **Authentication Requirements:**
+- ✅ **Kerberos authentication** (supported)
+- ❌ **Username/password authentication** (NOT supported)
+- ❌ **Basic authentication** (NOT supported)
+- ❌ **LDAP authentication** (NOT supported)
+
+**Before using this server, ensure:**
+1. Your Oracle database is configured for Kerberos authentication
+2. You have valid Kerberos tickets (`kinit` or equivalent)
+3. Your `krb5.conf` file is properly configured
+4. Your database connection strings use Kerberos service names
+
+**If your database uses username/password authentication, this server will not work for you.**
 
 ## Features
 
@@ -36,8 +54,10 @@ This server follows the **correct MCP architecture** where:
 
 - Java 17 or higher
 - Maven 3.6 or higher
-- Oracle Database access with appropriate credentials
-- For Kerberos authentication: Valid Kerberos tickets and proper krb5.conf configuration
+- **⚠️ Oracle Database with Kerberos authentication ONLY** (username/password auth not supported)
+- Valid Kerberos tickets (`kinit` command executed successfully)
+- Properly configured `krb5.conf` file with your Oracle database realm
+- Database connection strings configured for Kerberos service names
 
 ## Project Structure
 
@@ -102,9 +122,9 @@ The server will start and listen for MCP requests via STDIO (standard input/outp
 - **Description**: Search for database tables that match a pattern
 - **Purpose**: **For AI assistants to discover relevant tables**
 - **Examples**:
-  - `search_pattern: "trade"` → Finds `AFX_TRADE`, `TRADE_HISTORY` tables
-  - `search_pattern: "user"` → Finds `AFX_USERS`, `USER_PROFILES` tables
-  - `search_pattern: "order"` → Finds `AFX_ORDERS`, `ORDER_DETAILS` tables
+  - `search_pattern: "trade"` → Finds `TRADE_TABLE`, `TRADE_HISTORY` tables
+  - `search_pattern: "user"` → Finds `USER_TABLE`, `USER_PROFILES` tables
+  - `search_pattern: "order"` → Finds `ORDER_TABLE`, `ORDER_DETAILS` tables
 - **Parameters**:
   - `search_pattern` (string, required): Keyword to search for
   - `environment` (string, optional): dev, uat, or prod
@@ -211,14 +231,14 @@ The `database.properties` file contains **placeholder values** that must be repl
      }
    }
    ```
-   **Result**: Finds `AFX_TRADE` table with high relevance score
+   **Result**: Finds `TRADE_TABLE` table with high relevance score
 
 2. **📋 Get table structure**:
    ```json
    {
      "tool": "get_table_details", 
      "arguments": {
-       "table_name": "AFX.AFX_TRADE",
+       "table_name": "SCHEMA.TRADE_TABLE",
        "environment": "prod"
      }
    }
@@ -230,7 +250,7 @@ The `database.properties` file contains **placeholder values** that must be repl
    {
      "tool": "execute_query",
      "arguments": {
-       "sql": "SELECT TRADE_ID, TRADE_STATUS FROM AFX.AFX_TRADE WHERE TRADE_ID = 'abc123'",
+       "sql": "SELECT TRADE_ID, TRADE_STATUS FROM SCHEMA.TRADE_TABLE WHERE TRADE_ID = 'abc123'",
        "environment": "prod"
      }
    }
@@ -259,7 +279,7 @@ The `database.properties` file contains **placeholder values** that must be repl
    {
      "tool": "get_table_details",
      "arguments": {
-       "table_name": "AFX_USERS",
+       "table_name": "USER_TABLE",
        "environment": "dev"
      }
    }
@@ -270,7 +290,7 @@ The `database.properties` file contains **placeholder values** that must be repl
    {
      "tool": "execute_query", 
      "arguments": {
-       "sql": "SELECT USER_ID, USER_NAME, STATUS FROM AFX.AFX_USERS WHERE STATUS = 'ACTIVE'",
+       "sql": "SELECT USER_ID, USER_NAME, STATUS FROM SCHEMA.USER_TABLE WHERE STATUS = 'ACTIVE'",
        "environment": "dev"
      }
    }
@@ -315,7 +335,7 @@ This project is feature-complete and ready for use with proper database configur
 
 ### 🎉 Usage Examples (GitHub Copilot, Claude Desktop, etc.):
 
-**Natural Language Requests** *(Copilot figures out the tables and SQL)*:
+**Natural Language Requests** *(AI Assistant figures out the tables and SQL)*:
 - **"Can you please get me the status of Trade ID = 'abc123'?"**
 - **"Show me all active users in the development environment"**
 - **"Find orders with amount greater than 1000"**
