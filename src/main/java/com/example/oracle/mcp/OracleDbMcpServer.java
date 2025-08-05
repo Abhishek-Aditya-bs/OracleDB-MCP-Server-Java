@@ -628,7 +628,7 @@ public class OracleDbMcpServer {
                     String actualTableName;
                     
                     if (table.contains(".")) {
-                        String[] parts = table.split("\\\\.", 2);
+                        String[] parts = table.split("\\.", 2);
                         actualSchemaName = parts[0];
                         actualTableName = parts[1];
                     } else {
@@ -789,9 +789,10 @@ public class OracleDbMcpServer {
         // This handles common cases: FROM table_name, JOIN table_name, etc.
         String result = sql;
         
-        // Pattern to match table references after FROM, JOIN, UPDATE, INSERT INTO, etc.
-        // Matches: FROM table_name, JOIN table_name, etc. but not FROM schema.table_name
-        String pattern = "(?i)\\b(FROM|JOIN|UPDATE|INSERT\\s+INTO)\\s+([A-Za-z_][A-Za-z0-9_]*)(?!\\.)";
+        // Pattern to match table references after FROM, JOIN, etc.
+        // Matches table names but excludes those already prefixed with schema
+        // Handles: letters, numbers, underscores, and dollar signs (Oracle identifiers)
+        String pattern = "(?i)\\b(FROM|JOIN|UPDATE|INSERT\\s+INTO)\\s+([A-Za-z_$][A-Za-z0-9_$#]*)(?!\\.)";
         
         result = result.replaceAll(pattern, "$1 " + schemaName + ".$2");
         
